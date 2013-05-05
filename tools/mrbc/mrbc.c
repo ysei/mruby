@@ -23,6 +23,7 @@ struct _args {
   mrb_bool check_syntax : 1;
   mrb_bool verbose      : 1;
   mrb_bool debug_info   : 1;
+  byteorder_t output_byteorder;
 };
 
 static void
@@ -35,6 +36,7 @@ usage(const char *name)
   "-v           print version number, then turn on verbose mode",
   "-g           produce debugging information",
   "-B<symbol>   binary <symbol> output in C language format",
+  "-e<endian>   set output byte order ('big' or 'little')",
   "--verbose    run at verbose mode",
   "--version    print the version",
   "--copyright  print the copyright",
@@ -75,6 +77,7 @@ parse_args(mrb_state *mrb, int argc, char **argv, struct _args *args)
 
   *args = args_zero;
   args->ext = RITEBIN_EXT;
+  args->output_byteorder = BYTEORDER_NATIVE;
 
   for (argc--,argv++; argc > 0; argc--,argv++) {
     if (**argv == '-') {
@@ -105,6 +108,17 @@ parse_args(mrb_state *mrb, int argc, char **argv, struct _args *args)
         break;
       case 'c':
         args->check_syntax = 1;
+        break;
+      case 'e':
+        if (strcmp((*argv) + 2, "big") == 0) {
+          args->output_byteorder = BYTEORDER_BIG_ENDIAN;
+        } else if (strcmp((*argv) + 2, "little") == 0) {
+          args->output_byteorder = BYTEORDER_LITTLE_ENDIAN;
+        } else {
+          printf("%s: Given byte order is not specified.\n", *origargv);
+          result = EXIT_FAILURE;
+          goto exit;
+        }
         break;
       case 'v':
         if (!args->verbose) mrb_show_version(mrb);
@@ -216,14 +230,14 @@ main(int argc, char **argv)
     return EXIT_SUCCESS;
   }
   if (args.initname) {
-    n = mrb_dump_irep_cfunc(mrb, n, args.debug_info, args.wfp, args.initname);
+    n = mrb_dump_irep_cfunc_with_byteorder(mrb, n, args.debug_info, args.wfp, args.initname, args.output_byteorder);
     if (n == MRB_DUMP_INVALID_ARGUMENT) {
       printf("%s: Invalid C language symbol name\n", args.initname);
       return EXIT_FAILURE;
     }
   }
   else {
-    n = mrb_dump_irep_binary(mrb, n, args.debug_info, args.wfp);
+    n = mrb_dump_irep_binary_with_byteorder(mrb, n, args.debug_info, args.wfp, args.output_byteorder);
   }
 
   cleanup(mrb, &args);
