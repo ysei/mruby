@@ -13,12 +13,19 @@ extern "C" {
 
 #include "mruby.h"
 
+typedef enum byteorder_t {
+  BYTEORDER_NATIVE = 0,
+  BYTEORDER_LITTLE_ENDIAN,
+  BYTEORDER_BIG_ENDIAN,
+} byteorder_t;
+
 #ifdef ENABLE_STDIO
 int mrb_dump_irep_binary(mrb_state*, size_t, int, FILE*);
+int mrb_dump_irep_binary_with_byteorder(mrb_state*, size_t, int, FILE*, byteorder_t);
 int mrb_dump_irep_cfunc(mrb_state *mrb, size_t n, int, FILE *f, const char *initname);
+int mrb_dump_irep_cfunc_with_byteorder(mrb_state *mrb, size_t n, int, FILE *f, const char *initname, byteorder_t order);
 int32_t mrb_read_irep_file(mrb_state*, FILE*);
 #endif
-int32_t mrb_read_irep(mrb_state*, const uint8_t*);
 
 #ifdef ENABLE_STDIO
 mrb_value mrb_load_irep_file(mrb_state*,FILE*);
@@ -42,7 +49,8 @@ mrb_value mrb_load_irep_file(mrb_state*,FILE*);
 #define MRB_DUMP_NULL_SYM_LEN         0xFFFF
 
 /* Rite Binary File header */
-#define RITE_BINARY_IDENFIFIER        "RITE"
+#define RITE_BINARY_IDENTIFIER_BE     "RITE"
+#define RITE_BINARY_IDENTIFIER_LE     "ETIR"
 #define RITE_BINARY_FORMAT_VER        "0001"
 #define RITE_COMPILER_NAME            "MATZ"
 #define RITE_COMPILER_VERSION         "0000"
@@ -93,49 +101,99 @@ struct rite_binary_footer {
   RITE_SECTION_HEADER;
 };
 
+static inline byteorder_t get_byteorder(void) {
+  static union {
+    uint16_t u16;
+    uint8_t  u8[2];
+  } const u = { 0x0001U };
+  return u.u8[0] ? BYTEORDER_LITTLE_ENDIAN : BYTEORDER_BIG_ENDIAN;
+}
+
 static inline int
-uint8_to_bin(uint8_t s, uint8_t *bin)
+uint8_to_bin(uint8_t s, uint8_t *bin, byteorder_t order)
 {
   *bin = s;
   return sizeof(uint8_t);
 }
 
 static inline int
-uint16_to_bin(uint16_t s, uint8_t *bin)
+uint16_to_bin(uint16_t s, uint8_t *bin, byteorder_t order)
 {
-  *bin++ = (s >> 8) & 0xff;
-  *bin   = s & 0xff;
+  switch (order) {
+  case BYTEORDER_NATIVE:
+    *(uint16_t *)bin = s;
+    break;
+  case BYTEORDER_LITTLE_ENDIAN:
+    *bin++ = s & 0xff;
+    *bin   = (s >> 8) & 0xff;
+    break;
+  case BYTEORDER_BIG_ENDIAN:
+    *bin++ = (s >> 8) & 0xff;
+    *bin   = s & 0xff;
+    break;
+  }
   return sizeof(uint16_t);
 }
 
 static inline int
-uint32_to_bin(uint32_t l, uint8_t *bin)
+uint32_to_bin(uint32_t l, uint8_t *bin, byteorder_t order)
 {
-  *bin++ = (l >> 24) & 0xff;
-  *bin++ = (l >> 16) & 0xff;
-  *bin++ = (l >> 8) & 0xff;
-  *bin   = l & 0xff;
+  switch (order) {
+  case BYTEORDER_NATIVE:
+    *(uint32_t *)bin = l;
+    break;
+  case BYTEORDER_LITTLE_ENDIAN:
+    *bin++ = l & 0xff;
+    *bin++ = (l >>  8) & 0xff;
+    *bin++ = (l >> 16) & 0xff;
+    *bin   = (l >> 24) & 0xff;
+    break;
+  case BYTEORDER_BIG_ENDIAN:
+    *bin++ = (l >> 24) & 0xff;
+    *bin++ = (l >> 16) & 0xff;
+    *bin++ = (l >>  8) & 0xff;
+    *bin   = l & 0xff;
+    break;
+  }
   return sizeof(uint32_t);
 }
 
 static inline uint32_t
-bin_to_uint32(const uint8_t *bin)
+bin_to_uint32(const uint8_t *bin, byteorder_t order)
 {
-  return (uint32_t)bin[0] << 24 |
-         (uint32_t)bin[1] << 16 |
-         (uint32_t)bin[2] << 8  |
-         (uint32_t)bin[3];
+  switch (order) {
+  case BYTEORDER_LITTLE_ENDIAN:
+    return (uint32_t)bin[0]       |
+           (uint32_t)bin[1] << 8  |
+           (uint32_t)bin[2] << 16 |
+           (uint32_t)bin[3] << 24;
+  case BYTEORDER_BIG_ENDIAN:
+    return (uint32_t)bin[0] << 24 |
+           (uint32_t)bin[1] << 16 |
+           (uint32_t)bin[2] << 8  |
+           (uint32_t)bin[3];
+  default:
+    return *(uint32_t *)bin;
+  }
 }
 
 static inline uint16_t
-bin_to_uint16(const uint8_t *bin)
+bin_to_uint16(const uint8_t *bin, byteorder_t order)
 {
-  return (uint16_t)bin[0] << 8 |
-         (uint16_t)bin[1];
+  switch (order) {
+  case BYTEORDER_LITTLE_ENDIAN:
+    return (uint16_t)bin[0]      |
+           (uint16_t)bin[1] << 8;
+  case BYTEORDER_BIG_ENDIAN:
+    return (uint16_t)bin[0] << 8 |
+           (uint16_t)bin[1];
+  default:
+    return *(uint16_t *)bin;
+  }
 }
 
 static inline uint8_t
-bin_to_uint8(const uint8_t *bin)
+bin_to_uint8(const uint8_t *bin, byteorder_t order)
 {
   return (uint8_t)bin[0];
 }
