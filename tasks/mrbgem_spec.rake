@@ -133,7 +133,7 @@ module MRuby
           f.puts %Q[  int ai = mrb_gc_arena_save(mrb);]
           f.puts %Q[  mrb_#{funcname}_gem_init(mrb);] if objs != [objfile("#{build_dir}/gem_init")]
           unless rbfiles.empty?
-            f.puts %Q[  mrb_load_irep(mrb, gem_mrblib_irep_#{funcname});]
+            f.puts %Q[  mrb_load_irep_direct(mrb, gem_mrblib_irep_#{funcname});]
             f.puts %Q[  if (mrb->exc) {]
             f.puts %Q[    mrb_p(mrb, mrb_obj_value(mrb->exc));]
             f.puts %Q[    exit(EXIT_FAILURE);]
