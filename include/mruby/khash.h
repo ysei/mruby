@@ -12,6 +12,7 @@ extern "C" {
 #endif
 
 #include "mruby.h"
+#include "mruby/thread.h"
 #include <string.h>
 
 typedef uint32_t khint_t;
@@ -63,6 +64,7 @@ static const uint8_t __m_either[8] = {0x03, 0x0c, 0x30, 0xc0};
     khval_t *vals;                                                      \
     khint_t mask;                                                       \
     khint_t inc;                                                        \
+    MRB_DEFINE_LOCK_FIELD(lock);                                        \
   } kh_##name##_t;                                                      \
   void kh_alloc_##name(mrb_state *mrb, kh_##name##_t *h);               \
   kh_##name##_t *kh_init_##name##_size(mrb_state *mrb, khint_t size);   \
@@ -95,6 +97,7 @@ kh_fill_flags(uint8_t *p, uint8_t c, size_t len)
 #define KHASH_DEFINE(name, khkey_t, khval_t, kh_is_map, __hash_func, __hash_equal) \
   void kh_alloc_##name(mrb_state *mrb, kh_##name##_t *h)                \
   {                                                                     \
+    RWLOCK_WRLOCK(mrb, h->lock);                                        \
     khint_t sz = h->n_buckets;                                          \
     int len = sizeof(khkey_t) + (kh_is_map ? sizeof(khval_t) : 0);      \
     uint8_t *p = mrb_malloc(mrb, sizeof(uint8_t)*sz/4+len*sz);          \
@@ -106,9 +109,11 @@ kh_fill_flags(uint8_t *p, uint8_t c, size_t len)
     kh_fill_flags(h->ed_flags, 0xaa, sz/4);                             \
     h->mask = sz-1;                                                     \
     h->inc = sz/2-1;                                                    \
+    RWLOCK_UNLOCK(mrb, h->lock);                                        \
   }                                                                     \
   kh_##name##_t *kh_init_##name##_size(mrb_state *mrb, khint_t size) {  \
     kh_##name##_t *h = (kh_##name##_t*)mrb_calloc(mrb, 1, sizeof(kh_##name##_t)); \
+    RWLOCK_INIT(mrb, &h->lock);                                         \
     if (size < KHASH_MIN_SIZE)                                          \
       size = KHASH_MIN_SIZE;                                            \
     khash_power2(size);                                                 \
@@ -123,18 +128,22 @@ kh_fill_flags(uint8_t *p, uint8_t c, size_t len)
   {                                                                     \
     if (h) {                                                            \
       mrb_free(mrb, h->keys);                                           \
+      RWLOCK_DESTROY(mrb, h->lock);                                     \
       mrb_free(mrb, h);                                                 \
     }                                                                   \
   }                                                                     \
   void kh_clear_##name(mrb_state *mrb, kh_##name##_t *h)                \
   {                                                                     \
+    RWLOCK_WRLOCK(mrb, h->lock);                                        \
     if (h && h->ed_flags) {                                             \
       kh_fill_flags(h->ed_flags, 0xaa, h->n_buckets/4);                 \
       h->size = h->n_occupied = 0;                                      \
     }                                                                   \
+    RWLOCK_UNLOCK(mrb, h->lock);                                        \
   }                                                                     \
   khint_t kh_get_##name(mrb_state *mrb, kh_##name##_t *h, khkey_t key)  \
   {                                                                     \
+    RWLOCK_RDLOCK(mrb, h->lock);                                        \
     khint_t k = __hash_func(mrb,key) & (h->mask);                       \
     while (!__ac_isempty(h->ed_flags, k)) {                             \
       if (!__ac_isdel(h->ed_flags, k)) {                                \
@@ -142,12 +151,15 @@ kh_fill_flags(uint8_t *p, uint8_t c, size_t len)
       }                                                                 \
       k = (k+h->inc) & (h->mask);                                       \
     }                                                                   \
-    return h->n_buckets;                                                \
+    int volatile const n = h->n_buckets;                                \
+    RWLOCK_UNLOCK(mrb, h->lock);                                        \
+    return n;                                                           \
   }                                                                     \
   void kh_resize_##name(mrb_state *mrb, kh_##name##_t *h, khint_t new_n_buckets) \
   {                                                                     \
     if (new_n_buckets < KHASH_MIN_SIZE)                                 \
       new_n_buckets = KHASH_MIN_SIZE;                                   \
+    RWLOCK_WRLOCK(mrb, h->lock);                                        \
     khash_power2(new_n_buckets);                                        \
     {                                                                   \
       uint8_t *old_ed_flags = h->ed_flags;                              \
@@ -166,10 +178,12 @@ kh_fill_flags(uint8_t *p, uint8_t c, size_t len)
       }                                                                 \
       mrb_free(mrb, old_keys);                                          \
     }                                                                   \
+    RWLOCK_UNLOCK(mrb, h->lock);                                        \
   }                                                                     \
   khint_t kh_put_##name(mrb_state *mrb, kh_##name##_t *h, khkey_t key)  \
   {                                                                     \
     khint_t k;                                                          \
+    RWLOCK_WRLOCK(mrb, h->lock);                                        \
     if (h->n_occupied >= h->upper_bound) {                              \
       kh_resize_##name(mrb, h, h->n_buckets*2);                         \
     }                                                                   \
@@ -190,12 +204,15 @@ kh_fill_flags(uint8_t *p, uint8_t c, size_t len)
       h->ed_flags[k/4] &= ~__m_del[k%4];                                \
       h->size++;                                                        \
     }                                                                   \
+    RWLOCK_UNLOCK(mrb, h->lock);                                        \
     return k;                                                           \
   }                                                                     \
   void kh_del_##name(mrb_state *mrb, kh_##name##_t *h, khint_t x)       \
   {                                                                     \
+    RWLOCK_WRLOCK(mrb, h->lock);                                        \
     h->ed_flags[x/4] |= __m_del[x%4];                                   \
     h->size--;                                                          \
+    RWLOCK_UNLOCK(mrb, h->lock);                                        \
   }                                                                     \
   kh_##name##_t *kh_copy_##name(mrb_state *mrb, kh_##name##_t *h)       \
   {                                                                     \

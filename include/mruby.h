@@ -37,6 +37,7 @@ extern "C" {
 
 #include "mrbconf.h"
 #include "mruby/value.h"
+#include "mruby/thread.h"
 
 typedef uint32_t mrb_code;
 typedef uint32_t mrb_aspec;
@@ -96,6 +97,13 @@ enum gc_state {
   GC_STATE_SWEEP
 };
 
+typedef struct mrb_heaps {
+  struct heap_page *heaps;      /* heaps for GC */
+  struct heap_page *sweeps;     /**/
+  struct heap_page *free_heaps; /**/
+  size_t live;                  /* count of live objects */
+} mrb_heaps;
+
 typedef struct mrb_state {
   void *jmp;
 
@@ -124,10 +132,7 @@ typedef struct mrb_state {
   struct RClass *symbol_class;
   struct RClass *kernel_module;
 
-  struct heap_page *heaps;                /* heaps for GC */
-  struct heap_page *sweeps;
-  struct heap_page *free_heaps;
-  size_t live; /* count of live objects */
+  mrb_heaps *heaps;
 #ifdef MRB_GC_FIXED_ARENA
   struct RBasic *arena[MRB_GC_ARENA_SIZE]; /* GC protection array */
 #else
@@ -135,6 +140,13 @@ typedef struct mrb_state {
   int arena_capa;
 #endif
   int arena_idx;
+
+  MRB_VM_THREAD_TABLE;
+  MRB_VM_THREAD_APIs;
+  MRB_VM_THREAD_LOCK_APIs;
+  MRB_VM_LOCK_THREAD;
+  MRB_VM_LOCK_HEAP;
+  MRB_VM_LOCK_SYMTBL;
 
   enum gc_state gc_state; /* state of gc */
   int current_white_part; /* make white object by white_part */
