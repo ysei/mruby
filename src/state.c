@@ -52,6 +52,8 @@ mrb_open_allocf(mrb_allocf f, void *ud)
   mrb->root_c = mrb->c;
   mrb_init_core(mrb);
 
+  (void)MRB_VM_LOCK_INIT(mrb);
+
   return mrb;
 }
 
@@ -210,6 +212,7 @@ mrb_close(mrb_state *mrb)
 #ifndef MRB_GC_FIXED_ARENA
   mrb_free(mrb, mrb->arena);
 #endif
+  MRB_VM_LOCK_DESTROY(mrb);
   mrb_free(mrb, mrb);
 }
 
