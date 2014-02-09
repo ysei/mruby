@@ -19,6 +19,9 @@ MRuby::Build.new do |conf|
   # conf.gem :github => 'masuidrive/mrbgems-example', :branch => 'master'
   # conf.gem :git => 'git@github.com:masuidrive/mrbgems-example.git', :branch => 'master', :options => '-v'
 
+    conf.gem :github => 'mattn/mruby-thread', :branch => 'master'
+
+
   # include the default GEMs
   conf.gembox 'default'
 
