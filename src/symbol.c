@@ -37,7 +37,7 @@ KHASH_DEFINE (n2s, symbol_name, mrb_sym, 1, sym_hash_func, sym_hash_equal)
 static mrb_sym
 sym_intern(mrb_state *mrb, const char *name, size_t len, int lit)
 {
-  MRB_VM_SYMTBL_RDLOCK(mrb);
+  MRB_VM_SYMTBL_RDLOCK_AND_DEFINE(mrb);
 
   khash_t(n2s) *h = mrb->name2sym;
   symbol_name sname;
@@ -55,11 +55,11 @@ sym_intern(mrb_state *mrb, const char *name, size_t len, int lit)
   k = kh_get(n2s, mrb, h, sname);
   if (k != kh_end(h)) {
     mrb_sym const sym = kh_value(h, k);
-    MRB_VM_SYMTBL_UNLOCK(mrb);
+    MRB_VM_SYMTBL_UNLOCK_IF_LOCKED(mrb);
     return sym;
   }
 
-  MRB_VM_SYMTBL_UNLOCK(mrb);
+  MRB_VM_SYMTBL_UNLOCK_IF_LOCKED(mrb);
   MRB_VM_SYMTBL_WRLOCK(mrb);
 
   sym = ++mrb->symidx;
@@ -75,7 +75,7 @@ sym_intern(mrb_state *mrb, const char *name, size_t len, int lit)
   k = kh_put(n2s, mrb, h, sname);
   kh_value(h, k) = sym;
 
-  MRB_VM_SYMTBL_UNLOCK(mrb);
+  MRB_VM_SYMTBL_UNLOCK_IF_LOCKED(mrb);
 
   return sym;
 }
@@ -107,7 +107,7 @@ mrb_intern_str(mrb_state *mrb, mrb_value str)
 mrb_value
 mrb_check_intern(mrb_state *mrb, const char *name, size_t len)
 {
-  MRB_VM_SYMTBL_RDLOCK(mrb);
+  MRB_VM_SYMTBL_RDLOCK_AND_DEFINE(mrb);
 
   khash_t(n2s) *h = mrb->name2sym;
   symbol_name sname;
@@ -122,9 +122,10 @@ mrb_check_intern(mrb_state *mrb, const char *name, size_t len)
   k = kh_get(n2s, mrb, h, sname);
   if (k != kh_end(h)) {
     mrb_value const value = mrb_symbol_value(kh_value(h, k));
-    MRB_VM_SYMTBL_UNLOCK(mrb);
+    MRB_VM_SYMTBL_UNLOCK_IF_LOCKED(mrb);
     return value;
   }
+  MRB_VM_SYMTBL_UNLOCK_IF_LOCKED(mrb);
   return mrb_nil_value();
 }
 
@@ -144,7 +145,7 @@ mrb_check_intern_str(mrb_state *mrb, mrb_value str)
 const char*
 mrb_sym2name_len(mrb_state *mrb, mrb_sym sym, size_t *lenp)
 {
-  MRB_VM_SYMTBL_RDLOCK(mrb);
+  MRB_VM_SYMTBL_RDLOCK_AND_DEFINE(mrb);
 
   khash_t(n2s) *h = mrb->name2sym;
   khiter_t k;
@@ -154,13 +155,13 @@ mrb_sym2name_len(mrb_state *mrb, mrb_sym sym, size_t *lenp)
     if (kh_exist(h, k)) {
       if (kh_value(h, k) == sym) {
         sname = kh_key(h, k);
-        MRB_VM_SYMTBL_UNLOCK(mrb);
+        MRB_VM_SYMTBL_UNLOCK_IF_LOCKED(mrb);
         *lenp = sname.len;
         return sname.name;
       }
     }
   }
-  MRB_VM_SYMTBL_UNLOCK(mrb);
+  MRB_VM_SYMTBL_UNLOCK_IF_LOCKED(mrb);
   *lenp = 0;
   return NULL;  /* missing */
 }
@@ -168,7 +169,7 @@ mrb_sym2name_len(mrb_state *mrb, mrb_sym sym, size_t *lenp)
 void
 mrb_free_symtbl(mrb_state *mrb)
 {
-  MRB_VM_SYMTBL_WRLOCK(mrb);
+  MRB_VM_SYMTBL_WRLOCK_AND_DEFINE(mrb);
 
   khash_t(n2s) *h = mrb->name2sym;
   khiter_t k;
@@ -183,17 +184,17 @@ mrb_free_symtbl(mrb_state *mrb)
     }
   kh_destroy(n2s, mrb, mrb->name2sym);
 
-  MRB_VM_SYMTBL_UNLOCK(mrb);
+  MRB_VM_SYMTBL_UNLOCK_IF_LOCKED(mrb);
 }
 
 void
 mrb_init_symtbl(mrb_state *mrb)
 {
-  MRB_VM_SYMTBL_WRLOCK(mrb);
+  MRB_VM_SYMTBL_WRLOCK_AND_DEFINE(mrb);
 
   mrb->name2sym = kh_init(n2s, mrb);
 
-  MRB_VM_SYMTBL_UNLOCK(mrb);
+  MRB_VM_SYMTBL_UNLOCK_IF_LOCKED(mrb);
 }
 
 /**********************************************************************

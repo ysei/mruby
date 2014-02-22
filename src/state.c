@@ -52,7 +52,7 @@ mrb_open_allocf(mrb_allocf f, void *ud)
   mrb->root_c = mrb->c;
   mrb_init_core(mrb);
 
-  MRB_VM_LOCK_INIT(mrb);
+  (void)MRB_VM_LOCK_INIT(mrb);
 
   return mrb;
 }
