@@ -40,7 +40,8 @@ mrb_rwlock_destroy(mrb_state *mrb, mrb_rwlock_t *lock)
 int
 mrb_rwlock_wrlock(mrb_state *mrb, mrb_rwlock_t *lock)
 {
-  if (mrb->thread_lock_api.rwlock_wrlock) {
+/*
+   if (mrb->thread_lock_api.rwlock_wrlock) {
     if (!lock) {
       return RWLOCK_STATUS_INVALID_ARGUMENTS;
     }
@@ -54,12 +55,14 @@ mrb_rwlock_wrlock(mrb_state *mrb, mrb_rwlock_t *lock)
     }
     return status;
   }
+*/
   return RWLOCK_STATUS_NOT_SUPPORTED;
 }
 
 int
 mrb_rwlock_rdlock(mrb_state *mrb, mrb_rwlock_t *lock)
 {
+/*
   if (mrb->thread_lock_api.rwlock_rdlock) {
     if (!lock) {
       return RWLOCK_STATUS_INVALID_ARGUMENTS;
@@ -74,6 +77,7 @@ mrb_rwlock_rdlock(mrb_state *mrb, mrb_rwlock_t *lock)
     }
     return status;
   }
+*/
   return RWLOCK_STATUS_NOT_SUPPORTED;
 }
 
