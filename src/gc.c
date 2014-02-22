@@ -169,13 +169,13 @@ mrb_realloc_simple(mrb_state *mrb, void *p,  size_t len)
   void *p2;
 
   p2 = (mrb->allocf)(mrb, p, len, mrb->ud);
-  MRB_VM_HEAP_RDLOCK(mrb);
+  MRB_VM_HEAP_RDLOCK_AND_DEFINE(mrb);
   if (!p2 && len > 0 && mrb->heaps->heaps) {
-    MRB_VM_HEAP_UNLOCK(mrb);
+    MRB_VM_HEAP_UNLOCK_IF_LOCKED(mrb);
     mrb_full_gc(mrb);
     p2 = (mrb->allocf)(mrb, p, len, mrb->ud);
   } else {
-    MRB_VM_HEAP_UNLOCK(mrb);
+    MRB_VM_HEAP_UNLOCK_IF_LOCKED(mrb);
   }
 
   return p2;
@@ -261,12 +261,12 @@ struct heap_page {
 static void
 link_heap_page(mrb_state *mrb, struct heap_page *page)
 {
-  MRB_VM_HEAP_WRLOCK(mrb);
+  MRB_VM_HEAP_WRLOCK_AND_DEFINE(mrb);
   page->next = mrb->heaps->heaps;
   if (mrb->heaps->heaps)
     mrb->heaps->heaps->prev = page;
   mrb->heaps->heaps = page;
-  MRB_VM_HEAP_UNLOCK(mrb);
+  MRB_VM_HEAP_UNLOCK_IF_LOCKED(mrb);
 }
 
 static void
@@ -276,10 +276,12 @@ unlink_heap_page(mrb_state *mrb, struct heap_page *page)
     page->prev->next = page->next;
   if (page->next)
     page->next->prev = page->prev;
-  MRB_VM_HEAP_WRLOCK(mrb);
+
+  MRB_VM_HEAP_WRLOCK_AND_DEFINE(mrb);
   if (mrb->heaps->heaps == page)
     mrb->heaps->heaps = page->next;
-  MRB_VM_HEAP_UNLOCK(mrb);
+  MRB_VM_HEAP_UNLOCK_IF_LOCKED(mrb);
+
   page->prev = NULL;
   page->next = NULL;
 }
@@ -287,13 +289,13 @@ unlink_heap_page(mrb_state *mrb, struct heap_page *page)
 static void
 link_free_heap_page(mrb_state *mrb, struct heap_page *page)
 {
-  MRB_VM_HEAP_WRLOCK(mrb);
+  MRB_VM_HEAP_WRLOCK_AND_DEFINE(mrb);
   page->free_next = mrb->heaps->free_heaps;
   if (mrb->heaps->free_heaps) {
     mrb->heaps->free_heaps->free_prev = page;
   }
   mrb->heaps->free_heaps = page;
-  MRB_VM_HEAP_UNLOCK(mrb);
+  MRB_VM_HEAP_UNLOCK_IF_LOCKED(mrb);
 }
 
 static void
@@ -338,7 +340,7 @@ add_heap(mrb_state *mrb)
 void
 mrb_init_heap(mrb_state *mrb)
 {
-  MRB_VM_HEAP_WRLOCK(mrb);
+  MRB_VM_HEAP_WRLOCK_AND_DEFINE(mrb);
   mrb->heaps = mrb_malloc(mrb, sizeof(mrb_heaps));
   mrb->heaps->heaps = NULL;
   mrb->heaps->free_heaps = NULL;
@@ -353,7 +355,7 @@ mrb_init_heap(mrb_state *mrb)
 #ifdef GC_PROFILE
   program_invoke_time = gettimeofday_time();
 #endif
-  MRB_VM_HEAP_UNLOCK(mrb);
+  MRB_VM_HEAP_UNLOCK_IF_LOCKED(mrb);
 }
 
 static void obj_free(mrb_state *mrb, struct RBasic *obj);
@@ -361,7 +363,7 @@ static void obj_free(mrb_state *mrb, struct RBasic *obj);
 void
 mrb_free_heap(mrb_state *mrb)
 {
-  MRB_VM_HEAP_RDLOCK(mrb);
+  MRB_VM_HEAP_RDLOCK_AND_DEFINE(mrb);
 
   struct heap_page *page = mrb->heaps->heaps;
   struct heap_page *tmp;
@@ -379,7 +381,7 @@ mrb_free_heap(mrb_state *mrb)
 
   mrb_free(mrb, mrb->heaps);
 
-  MRB_VM_HEAP_UNLOCK(mrb);
+  MRB_VM_HEAP_UNLOCK_IF_LOCKED(mrb);
 }
 
 static void
@@ -420,12 +422,12 @@ mrb_obj_alloc(mrb_state *mrb, enum mrb_vtype ttype, struct RClass *cls)
   if (mrb->gc_threshold < mrb->heaps->live) {
     mrb_incremental_gc(mrb);
   }
-  MRB_VM_HEAP_RDLOCK(mrb);
+  MRB_VM_HEAP_RDLOCK_AND_DEFINE(mrb);
   if (mrb->heaps->free_heaps == NULL) {
-    MRB_VM_HEAP_UNLOCK(mrb);
+    MRB_VM_HEAP_UNLOCK_IF_LOCKED(mrb);
     add_heap(mrb);
   } else {
-    MRB_VM_HEAP_UNLOCK(mrb);
+    MRB_VM_HEAP_UNLOCK_IF_LOCKED(mrb);
   }
 
   MRB_VM_HEAP_WRLOCK(mrb);
@@ -433,7 +435,7 @@ mrb_obj_alloc(mrb_state *mrb, enum mrb_vtype ttype, struct RClass *cls)
   mrb->heaps->free_heaps->freelist = ((struct free_obj*)p)->next;
   if (mrb->heaps->free_heaps->freelist == NULL)
     unlink_free_heap_page(mrb, mrb->heaps->free_heaps);
-  MRB_VM_HEAP_UNLOCK(mrb);
+  MRB_VM_HEAP_UNLOCK_IF_LOCKED(mrb);
 
   mrb->heaps->live++;
   gc_protect(mrb, p);
@@ -885,7 +887,7 @@ incremental_sweep_phase(mrb_state *mrb, size_t limit)
       p++;
     }
 
-    MRB_VM_HEAP_WRLOCK(mrb);
+    MRB_VM_HEAP_WRLOCK_AND_DEFINE(mrb);
     /* free dead slot */
     if (dead_slot && freed < MRB_HEAP_PAGE_SIZE) {
       struct heap_page *next = page->next;
@@ -908,7 +910,7 @@ incremental_sweep_phase(mrb_state *mrb, size_t limit)
     tried_sweep += MRB_HEAP_PAGE_SIZE;
     mrb->heaps->live -= freed;
     mrb->gc_live_after_mark -= freed;
-    MRB_VM_HEAP_UNLOCK(mrb);
+    MRB_VM_HEAP_UNLOCK_IF_LOCKED(mrb);
   }
   mrb->heaps->sweeps = page;
   return tried_sweep;
@@ -1006,7 +1008,7 @@ mrb_incremental_gc(mrb_state *mrb)
   }
 
   if (mrb->gc_state == GC_STATE_NONE) {
-    mrb_assert(mrb->live >= mrb->gc_live_after_mark);
+    mrb_assert(mrb->heaps->live >= mrb->gc_live_after_mark);
     mrb->gc_threshold = (mrb->gc_live_after_mark/100) * mrb->gc_interval_ratio;
     if (mrb->gc_threshold < GC_STEP_SIZE) {
       mrb->gc_threshold = GC_STEP_SIZE;
@@ -1309,25 +1311,25 @@ gc_generational_mode_set(mrb_state *mrb, mrb_value self)
 }
 
 void
-mrb_objspace_each_objects(mrb_state *mrb, each_object_callback* callback, void *data)
+mrb_objspace_each_objects(mrb_state *mrb, mrb_each_object_callback *callback, void *data)
 {
-  MRB_VM_HEAP_RDLOCK(mrb);
+  MRB_VM_HEAP_RDLOCK_AND_DEFINE(mrb);
 
-    struct heap_page* page = mrb->heaps->heaps;
+  struct heap_page* page = mrb->heaps->heaps;
 
-    while (page != NULL) {
-        RVALUE *p, *pend;
+  while (page != NULL) {
+    RVALUE *p, *pend;
 
-        p = page->objects;
-        pend = p + MRB_HEAP_PAGE_SIZE;
-        for (;p < pend; p++) {
-           (*callback)(mrb, &p->as.basic, data);
-        }
-
-        page = page->next;
+    p = page->objects;
+    pend = p + MRB_HEAP_PAGE_SIZE;
+    for (;p < pend; p++) {
+      (*callback)(mrb, &p->as.basic, data);
     }
 
-  MRB_VM_HEAP_UNLOCK(mrb);
+    page = page->next;
+  }
+
+  MRB_VM_HEAP_UNLOCK_IF_LOCKED(mrb);
 }
 
 #ifdef GC_TEST
@@ -1529,7 +1531,7 @@ test_incremental_gc(void)
   mrb_assert(mrb->gc_state == GC_STATE_SWEEP);
 
   puts("  in GC_STATE_SWEEP");
-  MRB_VM_HEAP_RDLOCK(mrb);
+  MRB_VM_HEAP_RDLOCK_AND_DEFINE(mrb);
   page = mrb->heaps->heaps;
   while (page) {
     RVALUE *p = page->objects;
@@ -1546,7 +1548,7 @@ test_incremental_gc(void)
     page = page->next;
     total += MRB_HEAP_PAGE_SIZE;
   }
-  MRB_VM_HEAP_UNLOCK(mrb);
+  MRB_VM_HEAP_UNLOCK_IF_LOCKED(mrb);
 
   mrb_assert(mrb->gray_list == NULL);
 
@@ -1562,7 +1564,7 @@ test_incremental_gc(void)
    freed++;
    free = (RVALUE*)free->as.free.next;
   }
-  MRB_VM_HEAP_UNLOCK(mrb);
+  MRB_VM_HEAP_UNLOCK_IF_LOCKED(mrb);
 
   mrb_assert(mrb->live == live);
   mrb_assert(mrb->live == total-freed);
