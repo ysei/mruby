@@ -490,14 +490,19 @@ mrb_value
 mrb_yield_with_class(mrb_state *mrb, mrb_value b, int argc, mrb_value *argv, mrb_value self, struct RClass *c)
 {
   struct RProc *p;
-  mrb_sym mid = mrb->c->ci->mid;
+  mrb_sym mid;
   mrb_callinfo *ci;
-  int n = mrb->c->ci->nregs;
+  int n;
   mrb_value val;
 
   if (mrb_nil_p(b)) {
     mrb_raise(mrb, E_ARGUMENT_ERROR, "no block given");
   }
+  if (!mrb->c->stack) {
+    stack_init(mrb);
+  }
+  mid = mrb->c->ci->mid;
+  n = mrb->c->ci->nregs;
   p = mrb_proc_ptr(b);
   ci = cipush(mrb);
   ci->mid = mid;

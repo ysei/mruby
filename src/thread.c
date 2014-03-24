@@ -125,11 +125,6 @@ mrb_thread_free_invoke(mrb_state *mrb, mrb_gem_thread_t t)
 }
 
 
-typedef struct mrb_thread_impl {
-  mrb_state *mrb;
-  mrb_gem_thread_t thread;
-} mrb_thread_impl;
-
 extern void mrb_init_symtbl(mrb_state*);
 extern void mrb_init_class(mrb_state*);
 extern void mrb_init_object(mrb_state*);
@@ -157,24 +152,24 @@ extern void mrb_free_heap(mrb_state *mrb);
 static void
 mrb_init_core_for_thread(mrb_state *mrb)
 {
-  mrb_init_class(mrb); DONE;
-  mrb_init_object(mrb); DONE;
+//  mrb_init_class(mrb); DONE;
+//  mrb_init_object(mrb); DONE;
 //  mrb_init_kernel(mrb); DONE;
-  mrb_init_comparable(mrb); DONE;
-  mrb_init_enumerable(mrb); DONE;
+//  mrb_init_comparable(mrb); DONE;
+//  mrb_init_enumerable(mrb); DONE;
 
-  mrb_init_symbol(mrb); DONE;
-  mrb_init_exception(mrb); DONE;
-  mrb_init_proc(mrb); DONE;
-  mrb_init_string(mrb); DONE;
-  mrb_init_array(mrb); DONE;
-  mrb_init_hash(mrb); DONE;
-  mrb_init_numeric(mrb); DONE;
-  mrb_init_range(mrb); DONE;
-  mrb_init_gc(mrb); DONE;
-  mrb_init_mrblib(mrb); DONE;
+//  mrb_init_symbol(mrb); DONE;
+//  mrb_init_exception(mrb); DONE;
+//  mrb_init_proc(mrb); DONE;
+//  mrb_init_string(mrb); DONE;
+//  mrb_init_array(mrb); DONE;
+//  mrb_init_hash(mrb); DONE;
+//  mrb_init_numeric(mrb); DONE;
+//  mrb_init_range(mrb); DONE;
+//  mrb_init_gc(mrb); DONE;
+//  mrb_init_mrblib(mrb); DONE;
 #ifndef DISABLE_GEMS
-  mrb_init_mrbgems(mrb); DONE;
+//  mrb_init_mrbgems(mrb); DONE;
 #endif
 }
 
@@ -211,8 +206,6 @@ mrb_vm_thread_open(mrb_state *mrb)
   *thread_mrb = *mrb;
 
   thread_mrb->jmp = NULL;
-
-  thread_mrb->current_white_part = MRB_GC_WHITE_A;
 
 #ifndef MRB_GC_FIXED_ARENA
   thread_mrb->arena = (struct RBasic**)mrb_malloc(mrb, sizeof(struct RBasic*)*MRB_GC_ARENA_SIZE);
@@ -266,16 +259,14 @@ mrb_vm_thread_close(mrb_state *mrb)
 }
 
 mrb_state *
-mrb_vm_get_thread_state(mrb_thread thread)
+mrb_vm_get_thread_state(mrb_thread_t *thread)
 {
-  return ((mrb_thread_impl*)thread)->mrb;
+  return thread->mrb;
 }
 
 mrb_bool
-mrb_vm_attach_thread(mrb_state *mrb, mrb_thread *thread)
+mrb_vm_attach_thread(mrb_state *mrb, mrb_thread_t *thread)
 {
-  mrb_thread_impl *entry = NULL;
-
   if ((mrb == NULL) || (thread == NULL)) {
     /* invalid parameter */
     return FALSE;
@@ -298,27 +289,14 @@ mrb_vm_attach_thread(mrb_state *mrb, mrb_thread *thread)
     RWLOCK_RDLOCK(mrb, mrb->lock_thread);
   }
 
-  if (!mrb->thread_table->threads) {
-    RWLOCK_UNLOCK_IF_LOCKED(mrb, mrb->lock_thread);
-    RWLOCK_WRLOCK(mrb, mrb->lock_thread);
-    mrb_thread *threads = (mrb_thread*)mrb_malloc(mrb, sizeof(mrb_thread) * MRB_VM_THREAD_DEFAULT_CAPACITY);
-    if (!threads) {
-      RWLOCK_UNLOCK(mrb, mrb->lock_thread);
-      return FALSE;
-    }
-    mrb->thread_table->capacity = MRB_VM_THREAD_DEFAULT_CAPACITY;
-    mrb->thread_table->count = 0;
-    mrb->thread_table->threads = threads;
-    RWLOCK_UNLOCK_IF_LOCKED(mrb, mrb->lock_thread);
-    RWLOCK_RDLOCK(mrb, mrb->lock_thread);
-  }
+  mrb_thread_t *entry = NULL;
 
   size_t i;
   size_t const capacity = mrb->thread_table->capacity;
-  for (i = 0; i < capacity; ++i) {
-    if (mrb->thread_table->threads[i] != NULL) {
-      mrb_thread_impl *impl = (mrb_thread_impl*)mrb->thread_table->threads[i];
-      if (THREAD_EQUALS(mrb, THREAD_GET_SELF(mrb), impl->thread)) {
+  for (i = 1; i < capacity; ++i) {
+    if (mrb->thread_table->threads[i].mrb != NULL) {
+      mrb_thread_t *t = &mrb->thread_table->threads[i];
+      if (THREAD_EQUALS(mrb, THREAD_GET_SELF(mrb), t->thread)) {
         *thread = mrb->thread_table->threads[i];
         RWLOCK_UNLOCK_IF_LOCKED(mrb, mrb->lock_thread);
         return TRUE;
@@ -327,13 +305,12 @@ mrb_vm_attach_thread(mrb_state *mrb, mrb_thread *thread)
     }
     RWLOCK_UNLOCK_IF_LOCKED(mrb, mrb->lock_thread);
     RWLOCK_WRLOCK(mrb, mrb->lock_thread);
-    if (mrb->thread_table->threads[i] != NULL) {
+    if (mrb->thread_table->threads[i].mrb != NULL) {
       RWLOCK_UNLOCK_IF_LOCKED(mrb, mrb->lock_thread);
       RWLOCK_RDLOCK(mrb, mrb->lock_thread);
       continue;
     }
-    entry = (mrb_thread_impl*)mrb_malloc(mrb, sizeof(mrb_thread_impl));
-    mrb->thread_table->threads[i] = (mrb_thread)entry;
+    entry = &mrb->thread_table->threads[i];
     mrb->thread_table->count += 1;
     RWLOCK_UNLOCK_IF_LOCKED(mrb, mrb->lock_thread);
     break;
@@ -348,23 +325,22 @@ mrb_vm_attach_thread(mrb_state *mrb, mrb_thread *thread)
   entry->thread = THREAD_GET_SELF(entry->mrb);
 
   if (entry->mrb == NULL) {
-    mrb_free(mrb, entry);
     return FALSE;
   }
 
-  *thread = (mrb_thread)entry;
+  *thread = *entry;
 
   return TRUE;
 }
 
 void
-mrb_vm_detach_thread(mrb_state *mrb, mrb_thread thread)
+mrb_vm_detach_thread(mrb_state *mrb, mrb_thread_t *thread)
 {
   if (thread == NULL) {
     return;
   }
 
-  mrb_thread_impl *entry = NULL;
+  mrb_thread_t entry = { NULL, NULL };
 
   RWLOCK_RDLOCK_AND_DEFINE(mrb, mrb->lock_thread);
 
@@ -380,25 +356,26 @@ mrb_vm_detach_thread(mrb_state *mrb, mrb_thread thread)
   size_t i;
   size_t const capacity = mrb->thread_table->capacity;
   for (i = 0; i < capacity; ++i) {
-    if (mrb->thread_table->threads[i] != thread) {
+    if (mrb->thread_table->threads[i].mrb != thread->mrb) {
       continue;
     }
     RWLOCK_UNLOCK_IF_LOCKED(mrb, mrb->lock_thread);
     RWLOCK_WRLOCK(mrb, mrb->lock_thread);
-    if (mrb->thread_table->threads[i] == NULL) {
+    if (mrb->thread_table->threads[i].mrb == NULL) {
       RWLOCK_UNLOCK_IF_LOCKED(mrb, mrb->lock_thread);
       RWLOCK_RDLOCK(mrb, mrb->lock_thread);
       continue;
     }
-    entry = (mrb_thread_impl*)mrb->thread_table->threads[i];
-    mrb->thread_table->threads[i] = NULL;
+    entry = mrb->thread_table->threads[i];
+    mrb->thread_table->threads[i].mrb = NULL;
+    mrb->thread_table->threads[i].thread = NULL;
     mrb->thread_table->count -= 1;
     RWLOCK_UNLOCK_IF_LOCKED(mrb, mrb->lock_thread);
     break;
   }
 
-  THREAD_FREE(entry->mrb, entry->thread);
-  mrb_vm_thread_close(entry->mrb);
+  THREAD_FREE(entry.mrb, entry.thread);
+  mrb_vm_thread_close(entry.mrb);
 }
 
 void
@@ -419,6 +396,7 @@ mrb_vm_lock_init(mrb_state *mrb)
   mrb->lock_heap   = MRB_RWLOCK_INVALID;
   mrb->lock_symtbl = MRB_RWLOCK_INVALID;
   mrb->lock_thread = MRB_RWLOCK_INVALID;
+  mrb->lock_gc     = MRB_RWLOCK_INVALID;
 
   if (RWLOCK_INIT(mrb, mrb->lock_heap) != RWLOCK_STATUS_OK) {
     return FALSE;
@@ -427,6 +405,9 @@ mrb_vm_lock_init(mrb_state *mrb)
     return FALSE;
   }
   if (RWLOCK_INIT(mrb, mrb->lock_thread) != RWLOCK_STATUS_OK) {
+    return FALSE;
+  }
+  if (RWLOCK_INIT(mrb, mrb->lock_gc) != RWLOCK_STATUS_OK) {
     return FALSE;
   }
   return TRUE;
@@ -438,6 +419,7 @@ mrb_vm_lock_destroy(mrb_state *mrb)
   RWLOCK_DESTROY(mrb, mrb->lock_symtbl);
   RWLOCK_DESTROY(mrb, mrb->lock_heap);
   RWLOCK_DESTROY(mrb, mrb->lock_thread);
+  RWLOCK_DESTROY(mrb, mrb->lock_gc);
 }
 
 #endif

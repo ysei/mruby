@@ -358,13 +358,13 @@ mrb_float_value(struct mrb_state *mrb, mrb_float f)
 #define paint_gray(o) ((o)->color = MRB_GC_GRAY)
 #define paint_black(o) ((o)->color = MRB_GC_BLACK)
 #define paint_white(o) ((o)->color = MRB_GC_WHITES)
-#define paint_partial_white(s, o) ((o)->color = (s)->current_white_part)
+#define paint_partial_white(s, o) ((o)->color = mrb_gc_ctx_get_current_white_part(s))
 #define is_gray(o) ((o)->color == MRB_GC_GRAY)
 #define is_white(o) ((o)->color & MRB_GC_WHITES)
 #define is_black(o) ((o)->color & MRB_GC_BLACK)
 #define is_dead(s, o) (((o)->color & other_white_part(s) & MRB_GC_WHITES) || (o)->tt == MRB_TT_FREE)
-#define flip_white_part(s) ((s)->current_white_part = other_white_part(s))
-#define other_white_part(s) ((s)->current_white_part ^ MRB_GC_WHITES)
+#define flip_white_part(s) (mrb_gc_ctx_set_current_white_part(s, other_white_part(s)))
+#define other_white_part(s) (mrb_gc_ctx_get_current_white_part(s) ^ MRB_GC_WHITES)
 
 struct RBasic {
   MRB_OBJECT_HEADER;

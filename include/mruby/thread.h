@@ -7,18 +7,25 @@ extern "C" {
 
 #ifdef ENABLE_THREAD
 
-typedef void    *mrb_thread;
 typedef void    *mrb_gem_thread_t;
 typedef uint32_t mrb_gem_thread_id_t;
 typedef void    *mrb_gem_rwlock_t;
 
 /**
+ * Type of thread
+ */
+typedef struct mrb_thread_t {
+  struct mrb_state   *mrb;
+  mrb_gem_thread_t    thread;
+} mrb_thread_t;
+
+/**
  * Type of thread table
  */
 typedef struct mrb_thread_table_t {
-  size_t      capacity;
-  size_t      count;
-  mrb_thread *threads;
+  size_t        capacity;
+  size_t        count;
+  mrb_thread_t *threads;
 } mrb_thread_table_t;
 
 /**
@@ -124,6 +131,7 @@ extern void             mrb_thread_free_invoke(struct mrb_state *mrb, mrb_gem_th
 #define MRB_VM_LOCK_THREAD        MRB_DEFINE_LOCK_FIELD(lock_thread)
 #define MRB_VM_LOCK_HEAP          MRB_DEFINE_LOCK_FIELD(lock_heap)
 #define MRB_VM_LOCK_SYMTBL        MRB_DEFINE_LOCK_FIELD(lock_symtbl)
+#define MRB_VM_LOCK_GC            MRB_DEFINE_LOCK_FIELD(lock_gc)
 
 #ifdef ENABLE_THREAD
 extern mrb_bool mrb_vm_lock_init(struct mrb_state *mrb);
@@ -142,6 +150,12 @@ extern void     mrb_vm_lock_destroy(struct mrb_state *mrb);
 #define MRB_VM_SYMTBL_WRLOCK_AND_DEFINE(mrb) RWLOCK_WRLOCK_AND_DEFINE((mrb), (mrb)->lock_symtbl)
 #define MRB_VM_SYMTBL_UNLOCK(mrb)            RWLOCK_UNLOCK((mrb), (mrb)->lock_symtbl)
 #define MRB_VM_SYMTBL_UNLOCK_IF_LOCKED(mrb)  RWLOCK_UNLOCK_IF_LOCKED((mrb), (mrb)->lock_symtbl)
+#define MRB_VM_GC_RDLOCK(mrb)                RWLOCK_RDLOCK((mrb), (mrb)->lock_gc)
+#define MRB_VM_GC_RDLOCK_AND_DEFINE(mrb)     RWLOCK_RDLOCK_AND_DEFINE((mrb), (mrb)->lock_gc)
+#define MRB_VM_GC_WRLOCK(mrb)                RWLOCK_WRLOCK((mrb), (mrb)->lock_gc)
+#define MRB_VM_GC_WRLOCK_AND_DEFINE(mrb)     RWLOCK_WRLOCK_AND_DEFINE((mrb), (mrb)->lock_gc)
+#define MRB_VM_GC_UNLOCK(mrb)                RWLOCK_UNLOCK((mrb), (mrb)->lock_gc)
+#define MRB_VM_GC_UNLOCK_IF_LOCKED(mrb)      RWLOCK_UNLOCK_IF_LOCKED((mrb), (mrb)->lock_gc)
 #else
 #define MRB_VM_LOCK_INIT(mrb)                TRUE
 #define MRB_VM_LOCK_DESTROY(mrb)
@@ -157,12 +171,18 @@ extern void     mrb_vm_lock_destroy(struct mrb_state *mrb);
 #define MRB_VM_SYMTBL_WRLOCK_AND_DEFINE(mrb)
 #define MRB_VM_SYMTBL_UNLOCK(mrb)
 #define MRB_VM_SYMTBL_UNLOCK_IF_LOCKED(mrb)
+#define MRB_VM_GC_RDLOCK(mrb)
+#define MRB_VM_GC_RDLOCK_AND_DEFINE(mrb)
+#define MRB_VM_GC_WRLOCK(mrb)
+#define MRB_VM_GC_WRLOCK_AND_DEFINE(mrb)
+#define MRB_VM_GC_UNLOCK(mrb)
+#define MRB_VM_GC_UNLOCK_IF_LOCKED(mrb)
 #endif
 
 #ifdef ENABLE_THREAD
-extern struct mrb_state *mrb_vm_get_thread_state(mrb_thread thread);
-extern mrb_bool   mrb_vm_attach_thread(struct mrb_state *mrb, mrb_thread *thread);
-extern void       mrb_vm_detach_thread(struct mrb_state *mrb, mrb_thread thread);
+extern struct mrb_state *mrb_vm_get_thread_state(mrb_thread_t *thread);
+extern mrb_bool   mrb_vm_attach_thread(struct mrb_state *mrb, mrb_thread_t *thread);
+extern void       mrb_vm_detach_thread(struct mrb_state *mrb, mrb_thread_t *thread);
 extern void       mrb_vm_thread_api_set(struct mrb_state *mrb, mrb_thread_api const *api);
 extern void       mrb_vm_lock_api_set(struct mrb_state *mrb, mrb_thread_lock_api const *api);
 #endif

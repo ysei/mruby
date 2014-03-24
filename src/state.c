@@ -27,6 +27,7 @@ mrb_open_allocf(mrb_allocf f, void *ud)
 {
   static const mrb_state mrb_state_zero = { 0 };
   static const struct mrb_context mrb_context_zero = { 0 };
+  static const mrb_gc_context mrb_gc_context_zero = { 0 };
   mrb_state *mrb;
 
 #ifdef MRB_NAN_BOXING
@@ -39,7 +40,14 @@ mrb_open_allocf(mrb_allocf f, void *ud)
   *mrb = mrb_state_zero;
   mrb->ud = ud;
   mrb->allocf = f;
-  mrb->current_white_part = MRB_GC_WHITE_A;
+
+  mrb->gc_context = (mrb_gc_context*)(f)(NULL, NULL, sizeof(mrb_gc_context), ud);
+  if (mrb->gc_context == NULL) {
+    f(NULL, mrb, 0, ud);
+    return NULL;
+  }
+  *mrb->gc_context = mrb_gc_context_zero;
+  mrb->gc_context->current_white_part = MRB_GC_WHITE_A;
 
 #ifndef MRB_GC_FIXED_ARENA
   mrb->arena = (struct RBasic**)mrb_malloc(mrb, sizeof(struct RBasic*)*MRB_GC_ARENA_SIZE);
@@ -53,6 +61,18 @@ mrb_open_allocf(mrb_allocf f, void *ud)
   mrb_init_core(mrb);
 
   (void)MRB_VM_LOCK_INIT(mrb);
+
+#ifdef ENABLE_THREAD
+  mrb->thread_table = (mrb_thread_table_t*)mrb_malloc(mrb, sizeof(mrb_thread_table_t*));
+  mrb->thread_table->capacity = MRB_VM_THREAD_DEFAULT_CAPACITY;
+  mrb->thread_table->count    = 1;
+  mrb->thread_table->threads  = (mrb_thread_t*)mrb_malloc(mrb, sizeof(mrb_thread_t) * MRB_VM_THREAD_DEFAULT_CAPACITY);
+  mrb->thread_table->threads[0] = (mrb_thread_t){ mrb, NULL };
+  size_t i = 0;
+  for (i = 1; i < MRB_VM_THREAD_DEFAULT_CAPACITY; ++i) {
+    mrb->thread_table->threads[i] = (mrb_thread_t){ NULL, NULL };
+  }
+#endif
 
   return mrb;
 }
@@ -132,7 +152,6 @@ void
 mrb_irep_free(mrb_state *mrb, mrb_irep *irep)
 {
   size_t i;
-
   if (!(irep->flags & MRB_ISEQ_NO_FREE))
     mrb_free(mrb, irep->iseq);
   for (i=0; i<irep->plen; i++) {

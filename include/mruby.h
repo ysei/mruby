@@ -110,6 +110,22 @@ typedef struct mrb_heaps {
 
 struct mrb_jmpbuf;
 
+typedef struct mrb_gc_context {
+  enum gc_state gc_state;          /* state of gc */
+  int current_white_part;          /* make white object by white_part */
+  struct RBasic *gray_list;        /* list of gray objects to be traversed incrementally */
+  struct RBasic *atomic_gray_list; /* list of objects to be traversed atomically */
+  size_t gc_live_after_mark;
+  size_t gc_threshold;
+  int gc_interval_ratio;
+  int gc_step_ratio;
+  mrb_bool gc_disabled:1;
+  mrb_bool gc_full:1;
+  mrb_bool is_generational_gc_mode:1;
+  mrb_bool out_of_memory:1;
+  size_t majorgc_old_threshold;
+} mrb_gc_context;
+
 typedef struct mrb_state {
   struct mrb_jmpbuf *jmp;
 
@@ -153,20 +169,10 @@ typedef struct mrb_state {
   MRB_VM_LOCK_THREAD;
   MRB_VM_LOCK_HEAP;
   MRB_VM_LOCK_SYMTBL;
+  MRB_VM_LOCK_GC;
 
-  enum gc_state gc_state; /* state of gc */
-  int current_white_part; /* make white object by white_part */
-  struct RBasic *gray_list; /* list of gray objects to be traversed incrementally */
-  struct RBasic *atomic_gray_list; /* list of objects to be traversed atomically */
-  size_t gc_live_after_mark;
-  size_t gc_threshold;
-  int gc_interval_ratio;
-  int gc_step_ratio;
-  mrb_bool gc_disabled:1;
-  mrb_bool gc_full:1;
-  mrb_bool is_generational_gc_mode:1;
-  mrb_bool out_of_memory:1;
-  size_t majorgc_old_threshold;
+  mrb_gc_context *gc_context;
+
   struct alloca_header *mems;
 
   mrb_sym symidx;
@@ -182,6 +188,20 @@ typedef struct mrb_state {
 
   void *ud; /* auxiliary data */
 } mrb_state;
+
+static inline int mrb_gc_ctx_get_current_white_part(mrb_state *mrb) {
+  int current_white_part;
+  MRB_VM_GC_RDLOCK_AND_DEFINE(mrb);
+  current_white_part = mrb->gc_context->current_white_part;
+  MRB_VM_GC_UNLOCK_IF_LOCKED(mrb);
+  return current_white_part;
+}
+
+static inline void mrb_gc_ctx_set_current_white_part(mrb_state *mrb, int value) {
+  MRB_VM_GC_WRLOCK_AND_DEFINE(mrb);
+  mrb->gc_context->current_white_part = value;
+  MRB_VM_GC_UNLOCK_IF_LOCKED(mrb);
+}
 
 typedef mrb_value (*mrb_func_t)(mrb_state *mrb, mrb_value);
 struct RClass *mrb_define_class(mrb_state *, const char*, struct RClass*);
