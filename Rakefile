@@ -33,8 +33,11 @@ load "#{MRUBY_ROOT}/test/mrbtest.rake"
 # generic build targets, rules
 task :default => :all
 
+bin_path = "#{MRUBY_ROOT}/bin"
+FileUtils.mkdir_p bin_path, { :verbose => $verbose }
+
 depfiles = MRuby.targets['host'].bins.map do |bin|
-  install_path = MRuby.targets['host'].exefile("#{MRUBY_ROOT}/bin/#{bin}")
+  install_path = MRuby.targets['host'].exefile("#{bin_path}/#{bin}")
   source_path = MRuby.targets['host'].exefile("#{MRuby.targets['host'].build_dir}/bin/#{bin}")
 
   file install_path => source_path do |t|
@@ -61,7 +64,7 @@ MRuby.each_target do |target|
         gem_flags_after_libraries = gems.map { |g| g.linker.flags_after_libraries }
         gem_libraries = gems.map { |g| g.linker.libraries }
         gem_library_paths = gems.map { |g| g.linker.library_paths }
-        linker.run t.name, t.prerequisites, gem_libraries, gem_library_paths, gem_flags, gem_flags_before_libraries
+        linker.run t.name, t.prerequisites, gem_libraries, gem_library_paths, gem_flags, gem_flags_before_libraries, gem_flags_after_libraries
       end
 
       if target == MRuby.targets['host']
@@ -98,7 +101,7 @@ task :all => depfiles do
 end
 
 desc "run all mruby tests"
-task :test => MRuby.targets.values.map { |t| t.build_mrbtest_lib_only? ? t.libfile("#{t.build_dir}/test/mrbtest") : t.exefile("#{t.build_dir}/test/mrbtest") } do
+task :test => ["all"] + MRuby.targets.values.map { |t| t.build_mrbtest_lib_only? ? t.libfile("#{t.build_dir}/test/mrbtest") : t.exefile("#{t.build_dir}/test/mrbtest") } do
   MRuby.each_target do
     run_test unless build_mrbtest_lib_only?
   end

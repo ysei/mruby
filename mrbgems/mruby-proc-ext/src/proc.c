@@ -2,6 +2,7 @@
 #include "mruby/proc.h"
 #include "mruby/array.h"
 #include "mruby/string.h"
+#include "mruby/debug.h"
 
 static mrb_value
 mrb_proc_lambda(mrb_state *mrb, mrb_value self)
@@ -20,13 +21,14 @@ mrb_proc_source_location(mrb_state *mrb, mrb_value self)
   }
   else {
     mrb_irep *irep = p->body.irep;
-    mrb_value filename = mrb_nil_value();
-    mrb_value lines = mrb_nil_value();
+    int32_t line;
+    const char *filename;
 
-    if (irep->filename) filename = mrb_str_new_cstr(mrb, irep->filename);
-    if (irep->lines)    lines = mrb_fixnum_value(*irep->lines);
+    filename = mrb_debug_get_filename(irep, 0);
+    line = mrb_debug_get_line(irep, 0);
 
-    return mrb_assoc_new(mrb, filename, lines);
+    return (!filename && line == -1)? mrb_nil_value()
+        : mrb_assoc_new(mrb, mrb_str_new_cstr(mrb, filename), mrb_fixnum_value(line));
   }
 }
 
@@ -34,34 +36,34 @@ static mrb_value
 mrb_proc_inspect(mrb_state *mrb, mrb_value self)
 {
   struct RProc *p = mrb_proc_ptr(self);
-  mrb_value str = mrb_str_new_cstr(mrb, "#<Proc:");
+  mrb_value str = mrb_str_new_lit(mrb, "#<Proc:");
   mrb_str_concat(mrb, str, mrb_ptr_to_str(mrb, mrb_cptr(self)));
 
   if (!MRB_PROC_CFUNC_P(p)) {
     mrb_irep *irep = p->body.irep;
-    mrb_str_cat_cstr(mrb, str, "@");   
+    mrb_str_cat_lit(mrb, str, "@");
 
     if (irep->filename) {
       mrb_str_cat_cstr(mrb, str, irep->filename);
     }
     else {
-      mrb_str_cat_cstr(mrb, str, "-");
+      mrb_str_cat_lit(mrb, str, "-");
     }
-    mrb_str_cat_cstr(mrb, str, ":");
+    mrb_str_cat_lit(mrb, str, ":");
 
     if (irep->lines) {
       mrb_str_append(mrb, str, mrb_fixnum_value(*irep->lines));
     }
     else {
-      mrb_str_cat_cstr(mrb, str, "-");      
+      mrb_str_cat_lit(mrb, str, "-");
     }
   }
 
   if (MRB_PROC_STRICT_P(p)) {
-    mrb_str_cat_cstr(mrb, str, " (lambda)");
+    mrb_str_cat_lit(mrb, str, " (lambda)");
   }
 
-  mrb_str_cat_cstr(mrb, str, ">");
+  mrb_str_cat_lit(mrb, str, ">");
   return str;
 }
 

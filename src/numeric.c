@@ -17,8 +17,14 @@
 #ifdef MRB_USE_FLOAT
 #define floor(f) floorf(f)
 #define ceil(f) ceilf(f)
-#define floor(f) floorf(f)
 #define fmod(x,y) fmodf(x,y)
+#define FLO_MAX_DIGITS 7
+#define FLO_MAX_SIGN_LENGTH 3
+#define FLO_EPSILON FLT_EPSILON
+#else
+#define FLO_MAX_DIGITS 14
+#define FLO_MAX_SIGN_LENGTH 10
+#define FLO_EPSILON DBL_EPSILON
 #endif
 
 static mrb_float
@@ -48,7 +54,7 @@ static mrb_value
 num_pow(mrb_state *mrb, mrb_value x)
 {
   mrb_value y;
-  int both_int = FALSE;
+  mrb_bool both_int = FALSE;
   mrb_float d;
 
   mrb_get_args(mrb, "o", &y);
@@ -102,78 +108,115 @@ num_div(mrb_state *mrb, mrb_value x)
  *  representation.
  */
 
-mrb_value
-mrb_flo_to_str(mrb_state *mrb, mrb_value flo, int max_digit)
+static mrb_value
+mrb_flo_to_str(mrb_state *mrb, mrb_float flo)
 {
-  mrb_value result;
-  mrb_float n;
-
-  if (max_digit > 40) {
-    mrb_raise(mrb, E_RANGE_ERROR, "Too large max_digit.");
-  }
-  else if (!mrb_float_p(flo)) {
-    mrb_raise(mrb, E_TYPE_ERROR, "non float value");
-  }
-
-  n = mrb_float(flo);
+  double n = (double)flo;
+  int max_digits = FLO_MAX_DIGITS;
 
   if (isnan(n)) {
-    result = mrb_str_new(mrb, "NaN", 3);
+    return mrb_str_new_lit(mrb, "NaN");
   }
   else if (isinf(n)) {
     if (n < 0) {
-      result = mrb_str_new(mrb, "-inf", 4);
+      return mrb_str_new_lit(mrb, "-inf");
     }
     else {
-      result = mrb_str_new(mrb, "inf", 3);
+      return mrb_str_new_lit(mrb, "inf");
     }
   }
   else {
     int digit;
-    int m;
+    int m = 0;
     int exp;
-    int e = 0;
+    mrb_bool e = FALSE;
     char s[48];
     char *c = &s[0];
+    int length = 0;
 
-    if (n < 0) {
+    if (signbit(n)) {
       n = -n;
       *(c++) = '-';
     }
 
-    exp = (int)log10(n);
-
-    if ((exp < 0 ? -exp : exp) > max_digit) {
-      /* exponent representation */
-      e = 1;
-      m = exp;
-      if (m < 0) {
-        m -= 1;
+    if (n != 0.0) {
+      if (n > 1.0) {
+        exp = (int)floor(log10(n));
       }
-      n = n / pow(10.0, m);
-      m = 0;
+      else {
+        exp = (int)-ceil(-log10(n));
+      }
+    }
+    else {
+      exp = 0;
+    }
+    
+    /* preserve significands */
+    if (exp < 0) {
+      int i, beg = -1, end = 0;
+      double f = n;
+      double fd = 0;
+      for (i = 0; i < FLO_MAX_DIGITS; ++i) {
+        f = (f - fd) * 10.0;
+        fd = floor(f + FLO_EPSILON);
+        if (fd != 0) {
+          if (beg < 0) beg = i;
+          end = i + 1;
+        }
+      }
+      if (beg >= 0) length = end - beg;
+      if (length > FLO_MAX_SIGN_LENGTH) length = FLO_MAX_SIGN_LENGTH;
+    }
+
+    if (abs(exp) + length >= FLO_MAX_DIGITS) {
+      /* exponent representation */
+      e = TRUE;
+      n = n / pow(10.0, exp);
+      if (isinf(n)) {
+        if (s < c) {            /* s[0] == '-' */
+          return mrb_str_new_lit(mrb, "-0.0");
+        }
+        else {
+          return mrb_str_new_lit(mrb, "0.0");
+        }
+      }
     }
     else {
       /* un-exponent (normal) representation */
-      m = exp;
-      if (m < 0) {
-        m = 0;
+      if (exp > 0) {
+        m = exp;
       }
     }
 
     /* puts digits */
-    while (max_digit >= 0) {
-      mrb_float weight = pow(10.0, m);
-      digit = (int)floor(n / weight + FLT_EPSILON);
+    while (max_digits >= 0) {
+      double weight = pow(10.0, m);
+      double fdigit = n / weight;
+
+      if (fdigit < 0) fdigit = n = 0;
+      if (m < -1 && fdigit < FLO_EPSILON) {
+        if (e || exp > 0 || m <= -abs(exp)) {
+          break;
+        }
+      }
+      digit = (int)floor(fdigit + FLO_EPSILON);
+      if (m == 0 && digit > 9) {
+        n /= 10.0;
+        exp++;
+        continue;
+      }
       *(c++) = '0' + digit;
       n -= (digit * weight);
-      max_digit--;
+      max_digits--;
       if (m-- == 0) {
         *(c++) = '.';
       }
-      else if (m < -1 && n < FLT_EPSILON) {
-        break;
+    }
+    if (c[-1] == '0') {
+      while (&s[0] < c && c[-1] == '0') {
+        c--;
       }
+      c++;
     }
 
     if (e) {
@@ -187,7 +230,8 @@ mrb_flo_to_str(mrb_state *mrb, mrb_value flo, int max_digit)
       }
 
       if (exp >= 100) {
-        mrb_raise(mrb, E_RANGE_ERROR, "Too large exponent.");
+        *(c++) = '0' + exp / 100;
+        exp -= exp / 100 * 100;
       }
 
       *(c++) = '0' + exp / 10;
@@ -196,10 +240,8 @@ mrb_flo_to_str(mrb_state *mrb, mrb_value flo, int max_digit)
 
     *c = '\0';
 
-    result = mrb_str_new(mrb, &s[0], c - &s[0]);
+    return mrb_str_new(mrb, &s[0], c - &s[0]);
   }
-
-  return result;
 }
 
 /* 15.2.9.3.16(x) */
@@ -216,11 +258,7 @@ mrb_flo_to_str(mrb_state *mrb, mrb_value flo, int max_digit)
 static mrb_value
 flo_to_s(mrb_state *mrb, mrb_value flt)
 {
-#ifdef MRB_USE_FLOAT
-  return mrb_flo_to_str(mrb, flt, 7);
-#else
-  return mrb_flo_to_str(mrb, flt, 14);
-#endif
+  return mrb_flo_to_str(mrb, mrb_float(flt));
 }
 
 /* 15.2.9.3.2  */
@@ -266,8 +304,8 @@ flodivmod(mrb_state *mrb, mrb_float x, mrb_float y, mrb_float *divp, mrb_float *
   mrb_float mod;
 
   if (y == 0.0) {
-    div = str_to_mrb_float("inf");
-    mod = str_to_mrb_float("nan");
+    div = INFINITY;
+    mod = NAN;
   }
   else {
     mod = fmod(x, y);
@@ -556,6 +594,16 @@ flo_round(mrb_state *mrb, mrb_value num)
 
   mrb_get_args(mrb, "|i", &ndigits);
   number = mrb_float(num);
+
+  if (isinf(number)) {
+    if (0 < ndigits) return num;
+    else mrb_raise(mrb, E_FLOATDOMAIN_ERROR, number < 0 ? "-Infinity" : "Infinity");
+  }
+  if (isnan(number)) {
+    if (0 < ndigits) return num;
+    else mrb_raise(mrb, E_FLOATDOMAIN_ERROR, "NaN");
+  }
+
   f = 1.0;
   i = abs(ndigits);
   while  (--i >= 0)
@@ -583,7 +631,11 @@ flo_round(mrb_state *mrb, mrb_value num)
     if (ndigits < 0) number *= f;
     else number /= f;
   }
-  if (ndigits > 0) return mrb_float_value(mrb, number);
+
+  if (ndigits > 0) {
+    if (isinf(number) || isnan(number)) return num;
+    return mrb_float_value(mrb, number);
+  }
   return mrb_fixnum_value((mrb_int)number);
 }
 
@@ -642,7 +694,7 @@ int_to_i(mrb_state *mrb, mrb_value num)
   return num;
 }
 
-#define SQRT_INT_MAX ((mrb_int)1<<((sizeof(mrb_int)*CHAR_BIT-1)/2))
+#define SQRT_INT_MAX ((mrb_int)1<<((MRB_INT_BIT-1)/2))
 /*tests if N*N would overflow*/
 #define FIT_SQRT_INT(n) (((n)<SQRT_INT_MAX)&&((n)>=-SQRT_INT_MAX))
 
@@ -652,10 +704,10 @@ mrb_fixnum_mul(mrb_state *mrb, mrb_value x, mrb_value y)
   mrb_int a;
 
   a = mrb_fixnum(x);
-  if (a == 0) return x;
   if (mrb_fixnum_p(y)) {
     mrb_int b, c;
 
+    if (a == 0) return x;
     b = mrb_fixnum(y);
     if (FIT_SQRT_INT(a) && FIT_SQRT_INT(b))
       return mrb_fixnum_value(a*b);
@@ -663,7 +715,7 @@ mrb_fixnum_mul(mrb_state *mrb, mrb_value x, mrb_value y)
     if (a != 0 && c/a != b) {
       return mrb_float_value(mrb, (mrb_float)a*(mrb_float)b);
     }
-    return mrb_fixnum_value(c);;
+    return mrb_fixnum_value(c);
   }
   return mrb_float_value(mrb, (mrb_float)a * mrb_to_flo(mrb, y));
 }
@@ -737,7 +789,7 @@ fix_mod(mrb_state *mrb, mrb_value x)
     mrb_int mod;
 
     if (mrb_fixnum(y) == 0) {
-      return mrb_float_value(mrb, str_to_mrb_float("nan"));
+      return mrb_float_value(mrb, NAN);
     }
     fixdivmod(mrb, a, mrb_fixnum(y), 0, &mod);
     return mrb_fixnum_value(mod);
@@ -767,8 +819,8 @@ fix_divmod(mrb_state *mrb, mrb_value x)
     mrb_int div, mod;
 
     if (mrb_fixnum(y) == 0) {
-      return mrb_assoc_new(mrb, mrb_float_value(mrb, str_to_mrb_float("inf")),
-        mrb_float_value(mrb, str_to_mrb_float("nan")));
+      return mrb_assoc_new(mrb, mrb_float_value(mrb, INFINITY),
+        mrb_float_value(mrb, NAN));
     }
     fixdivmod(mrb, mrb_fixnum(x), mrb_fixnum(y), &div, &mod);
     return mrb_assoc_new(mrb, mrb_fixnum_value(div), mrb_fixnum_value(mod));
@@ -921,13 +973,14 @@ fix_xor(mrb_state *mrb, mrb_value x)
   return mrb_fixnum_value(val);
 }
 
-#define NUMERIC_SHIFT_WIDTH_MAX (sizeof(mrb_int)*CHAR_BIT-1)
+#define NUMERIC_SHIFT_WIDTH_MAX (MRB_INT_BIT-1)
 
 static mrb_value
-lshift(mrb_state *mrb, mrb_int val, size_t width)
+lshift(mrb_state *mrb, mrb_int val, mrb_int width)
 {
+  mrb_assert(width >= 0);
   if (width > NUMERIC_SHIFT_WIDTH_MAX) {
-    mrb_raisef(mrb, E_RANGE_ERROR, "width(%S) > (%S:sizeof(mrb_int)*CHAR_BIT-1)",
+    mrb_raisef(mrb, E_RANGE_ERROR, "width(%S) > (%S:MRB_INT_BIT-1)",
                mrb_fixnum_value(width),
                mrb_fixnum_value(NUMERIC_SHIFT_WIDTH_MAX));
   }
@@ -936,8 +989,9 @@ lshift(mrb_state *mrb, mrb_int val, size_t width)
 }
 
 static mrb_value
-rshift(mrb_int val, size_t width)
+rshift(mrb_int val, mrb_int width)
 {
+  mrb_assert(width >= 0);
   if (width >= NUMERIC_SHIFT_WIDTH_MAX) {
     if (val < 0) {
       val = -1;
@@ -1093,10 +1147,10 @@ mrb_fixnum_plus(mrb_state *mrb, mrb_value x, mrb_value y)
   mrb_int a;
 
   a = mrb_fixnum(x);
-  if (a == 0) return y;
   if (mrb_fixnum_p(y)) {
     mrb_int b, c;
 
+    if (a == 0) return y;
     b = mrb_fixnum(y);
     c = a + b;
     if (((a < 0) ^ (b < 0)) == 0 && (a < 0) != (c < 0)) {
@@ -1169,7 +1223,7 @@ fix_minus(mrb_state *mrb, mrb_value self)
 mrb_value
 mrb_fixnum_to_str(mrb_state *mrb, mrb_value x, int base)
 {
-  char buf[sizeof(mrb_int)*CHAR_BIT+1];
+  char buf[MRB_INT_BIT+1];
   char *b = buf + sizeof buf;
   mrb_int val = mrb_fixnum(x);
 
@@ -1268,15 +1322,14 @@ num_cmp(mrb_state *mrb, mrb_value self)
  * and <code>other</code>.
  */
 static mrb_value
-flo_plus(mrb_state *mrb, mrb_value self)
+flo_plus(mrb_state *mrb, mrb_value x)
 {
-  mrb_float x,  y;
+  mrb_value y;
 
-  x = mrb_float(self);
-  mrb_get_args(mrb, "f", &y);
-
-  return mrb_float_value(mrb, x + y);
+  mrb_get_args(mrb, "o", &y);
+  return mrb_float_value(mrb, mrb_float(x) + mrb_to_flo(mrb, y));
 }
+
 /* ------------------------------------------------------------------------*/
 void
 mrb_init_numeric(mrb_state *mrb)

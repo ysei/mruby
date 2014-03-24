@@ -15,6 +15,9 @@ assert('Integer#+', '15.2.8.3.1') do
 
   assert_equal 2, a
   assert_equal 2.0, b
+
+  assert_raise(TypeError){ 0+nil }
+  assert_raise(TypeError){ 1+nil }
 end
 
 assert('Integer#-', '15.2.8.3.2') do
@@ -31,6 +34,9 @@ assert('Integer#*', '15.2.8.3.3') do
 
   assert_equal 1, a
   assert_equal 1.0, b
+
+  assert_raise(TypeError){ 0*nil }
+  assert_raise(TypeError){ 1*nil }
 end
 
 assert('Integer#/', '15.2.8.3.4') do
@@ -206,6 +212,16 @@ assert('Integer#upto', '15.2.8.3.27') do
 end
 
 # Not ISO specified
+
+assert('Integer#divmod') do
+  assert_equal [ 0,  0],   0.divmod(1)
+  assert_equal [ 0,  1],   1.divmod(3)
+  assert_equal [ 3,  0],   3.divmod(1)
+  assert_equal [ 2,  6],  20.divmod(7)
+  assert_equal [-1,  2],  -3.divmod(5)
+  assert_equal [-2, -1],  25.divmod(-13)
+  assert_equal [ 1, -6], -13.divmod(-7)
+end
 
 assert('Integer#step') do
   a = []

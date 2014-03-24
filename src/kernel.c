@@ -10,29 +10,29 @@
 #include "mruby/proc.h"
 #include "mruby/string.h"
 #include "mruby/variable.h"
-#include "error.h"
+#include "mruby/error.h"
 
 typedef enum {
-    NOEX_PUBLIC    = 0x00,
-    NOEX_NOSUPER   = 0x01,
-    NOEX_PRIVATE   = 0x02,
-    NOEX_PROTECTED = 0x04,
-    NOEX_MASK      = 0x06,
-    NOEX_BASIC     = 0x08,
-    NOEX_UNDEF     = NOEX_NOSUPER,
-    NOEX_MODFUNC   = 0x12,
-    NOEX_SUPER     = 0x20,
-    NOEX_VCALL     = 0x40,
-    NOEX_RESPONDS  = 0x80
+  NOEX_PUBLIC    = 0x00,
+  NOEX_NOSUPER   = 0x01,
+  NOEX_PRIVATE   = 0x02,
+  NOEX_PROTECTED = 0x04,
+  NOEX_MASK      = 0x06,
+  NOEX_BASIC     = 0x08,
+  NOEX_UNDEF     = NOEX_NOSUPER,
+  NOEX_MODFUNC   = 0x12,
+  NOEX_SUPER     = 0x20,
+  NOEX_VCALL     = 0x40,
+  NOEX_RESPONDS  = 0x80
 } mrb_method_flag_t;
 
 mrb_bool
 mrb_obj_basic_to_s_p(mrb_state *mrb, mrb_value obj)
 {
-    struct RProc *me = mrb_method_search(mrb, mrb_class(mrb, obj), mrb_intern_lit(mrb, "to_s"));
-    if (me && MRB_PROC_CFUNC_P(me) && (me->body.func == mrb_any_to_s))
-      return TRUE;
-    return FALSE;
+  struct RProc *me = mrb_method_search(mrb, mrb_class(mrb, obj), mrb_intern_lit(mrb, "to_s"));
+  if (me && MRB_PROC_CFUNC_P(me) && (me->body.func == mrb_any_to_s))
+    return TRUE;
+  return FALSE;
 }
 
 /* 15.3.1.3.17 */
@@ -157,36 +157,6 @@ mrb_obj_id_m(mrb_state *mrb, mrb_value self)
   return mrb_fixnum_value(mrb_obj_id(self));
 }
 
-/* 15.3.1.3.4  */
-/* 15.3.1.3.44 */
-/*
- *  call-seq:
- *     obj.send(symbol [, args...])        -> obj
- *     obj.__send__(symbol [, args...])      -> obj
- *
- *  Invokes the method identified by _symbol_, passing it any
- *  arguments specified. You can use <code>__send__</code> if the name
- *  +send+ clashes with an existing method in _obj_.
- *
- *     class Klass
- *       def hello(*args)
- *         "Hello " + args.join(' ')
- *       end
- *     end
- *     k = Klass.new
- *     k.send :hello, "gentle", "readers"   #=> "Hello gentle readers"
- */
-static mrb_value
-mrb_f_send(mrb_state *mrb, mrb_value self)
-{
-  mrb_sym name;
-  mrb_value block, *argv;
-  int argc;
-
-  mrb_get_args(mrb, "n*&", &name, &argv, &argc, &block);
-  return mrb_funcall_with_block(mrb,self, name, argc, argv, block);
-}
-
 /* 15.3.1.2.2  */
 /* 15.3.1.2.5  */
 /* 15.3.1.3.6  */
@@ -218,7 +188,7 @@ mrb_f_block_given_p_m(mrb_state *mrb, mrb_value self)
   mrb_value *bp;
   mrb_bool given_p;
 
-  bp = mrb->c->stbase + ci->stackidx + 1;
+  bp = ci->stackent + 1;
   ci--;
   if (ci <= mrb->c->cibase) {
     given_p = 0;
@@ -309,6 +279,7 @@ init_copy(mrb_state *mrb, mrb_value dest, mrb_value obj)
       case MRB_TT_CLASS:
       case MRB_TT_MODULE:
         copy_class(mrb, dest, obj);
+        /* fall through */
       case MRB_TT_OBJECT:
       case MRB_TT_SCLASS:
       case MRB_TT_HASH:
@@ -484,8 +455,6 @@ mrb_obj_init_copy(mrb_state *mrb, mrb_value self)
   return self;
 }
 
-mrb_value mrb_yield_internal(mrb_state *mrb, mrb_value b, int argc, mrb_value *argv, mrb_value self, struct RClass *c);
-
 /* 15.3.1.3.18 */
 /*
  *  call-seq:
@@ -528,7 +497,7 @@ mrb_obj_instance_eval(mrb_state *mrb, mrb_value self)
     c = mrb_class_ptr(cv);
     break;
   }
-  return mrb_yield_internal(mrb, b, 0, 0, self, c);
+  return mrb_yield_with_class(mrb, b, 0, 0, self, c);
 }
 
 mrb_bool
@@ -559,7 +528,7 @@ obj_is_instance_of(mrb_state *mrb, mrb_value self)
 }
 
 static void
-valid_iv_name(mrb_state *mrb, mrb_sym iv_name_id, const char* s, size_t len)
+valid_iv_name(mrb_state *mrb, mrb_sym iv_name_id, const char* s, mrb_int len)
 {
   if (len < 2 || !(s[0] == '@' && s[1] != '@')) {
     mrb_name_error(mrb, iv_name_id, "`%S' is not allowed as an instance variable name", mrb_sym2str(mrb, iv_name_id));
@@ -570,7 +539,7 @@ static void
 check_iv_name(mrb_state *mrb, mrb_sym iv_name_id)
 {
   const char *s;
-  size_t len;
+  mrb_int len;
 
   s = mrb_sym2name_len(mrb, iv_name_id, &len);
   valid_iv_name(mrb, iv_name_id, s, len);
@@ -584,7 +553,7 @@ get_valid_iv_sym(mrb_state *mrb, mrb_value iv_name)
   mrb_assert(mrb_symbol_p(iv_name) || mrb_string_p(iv_name));
 
   if (mrb_string_p(iv_name)) {
-    iv_name_id = mrb_intern_cstr(mrb, RSTRING_PTR(iv_name));
+    iv_name_id = mrb_intern(mrb, RSTRING_PTR(iv_name), RSTRING_LEN(iv_name));
     valid_iv_name(mrb, iv_name_id, RSTRING_PTR(iv_name), RSTRING_LEN(iv_name));
   }
   else {

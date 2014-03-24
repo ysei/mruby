@@ -1,20 +1,14 @@
-# !!Notice!!
-    This is a preliminary release for internal team review.
-    The URLs and addresses described below are not available yet.
-    The official release will be announced later.
-    Any suggestions for modification are welcome.
-    Delays in replies are to be expected. Sorry in advance.
-
 [![Build Status](https://travis-ci.org/mruby/mruby.png?branch=master)](https://travis-ci.org/mruby/mruby)
 
 ## What's mruby
 
 mruby is the lightweight implementation of the Ruby language complying to (part of)
-the [ISO standard](http://www.iso.org/iso/iso_catalogue/catalogue_tc/catalogue_detail.htm?csnumber=59579). 
-mruby can be linked and embedded within your application.  We provide the interpreter program "mruby" and 
+the [ISO standard](http://www.iso.org/iso/iso_catalogue/catalogue_tc/catalogue_detail.htm?csnumber=59579).
+mruby can be linked and embedded within your application.  We provide the interpreter program "mruby" and
 the interactive mruby shell "mirb" as examples.  You can also compile Ruby programs into compiled byte code
-using the mruby compiler "mrbc".  All those tools reside in "bin" directory.  The "mrbc" is also able to
-generate compiled byte code in a C source file.  You can check the "mrbtest" program under the "test" directory.
+using the mruby compiler "mrbc".  All those tools reside in the "bin" directory.  "mrbc" is also able to
+generate compiled byte code in a C source file, see the "mrbtest" program under the "test" directory
+for an example.
 
 This achievement was sponsored by the Regional Innovation Creation R&D Programs of
 the Ministry of Economy, Trade and Industry of Japan.
@@ -22,7 +16,11 @@ the Ministry of Economy, Trade and Industry of Japan.
 
 ## How to get mruby
 
-The mruby distribution files can be found in the following site:
+The stable version 1.0.0 of mruby can be downloaded via the following URL:
+
+  https://github.com/mruby/mruby/archive/1.0.0.zip
+
+The latest development version of mruby can be downloaded via the following URL:
 
   https://github.com/mruby/mruby/zipball/master
 
@@ -31,17 +29,10 @@ following command:
 
     $ git clone https://github.com/mruby/mruby.git
 
-There are some other branches under development. Try the following
-command and see the list of branches:
-
-    $ git branch -r
-
 
 ## mruby home-page
 
-mruby's website is not launched yet but we are actively working on it.
-
-The URL of the mruby home-page will be:
+The URL of the mruby home-page is:
 
   http://www.mruby.org/
 
@@ -51,7 +42,7 @@ The URL of the mruby home-page will be:
 To subscribe to the mruby mailing list....[T.B.D.]
 
 
-## How to compile and install
+## How to compile and install (mruby and gems)
 
 See the INSTALL file.
 

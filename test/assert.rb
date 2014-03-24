@@ -9,10 +9,11 @@ def t_print(*args)
   i = 0
   len = args.size
   while i < len
+    str = args[i].to_s
     begin
-      __printstr__ args[i].to_s
+      __printstr__ str
     rescue NoMethodError
-      __t_printstr__ args[i].to_s
+      __t_printstr__ str rescue print str
     end
     i += 1
   end
@@ -77,7 +78,7 @@ end
 def assert_true(ret, msg = nil, diff = nil)
   if $mrbtest_assert
     $mrbtest_assert_idx += 1
-    if !ret
+    unless ret
       msg = "Expected #{ret.inspect} to be true" unless msg
       diff = assertion_diff(true, ret)  unless diff
       $mrbtest_assert.push([$mrbtest_assert_idx, msg, diff])
@@ -173,6 +174,24 @@ def assert_raise(*exp)
   ret
 end
 
+def assert_nothing_raised(*exp)
+  ret = true
+  if $mrbtest_assert
+    $mrbtest_assert_idx += 1
+    msg = exp.last.class == String ? exp.pop : ""
+    begin
+      yield
+    rescue Exception => e
+      msg = "#{msg} exception raised."
+      diff = "      Class: <#{e.class}>\n" +
+             "    Message: #{e.message}"
+      $mrbtest_assert.push([$mrbtest_assert_idx, msg, diff])
+      ret = false
+    end
+  end
+  ret
+end
+
 ##
 # Fails unless +obj+ is a kind of +cls+.
 def assert_kind_of(cls, obj, msg = nil)
@@ -199,7 +218,7 @@ def report()
     puts msg
   end
 
-  $total_test = $ok_test.+($ko_test)
+  $total_test = $ok_test+$ko_test+$kill_test
   t_print("Total: #{$total_test}\n")
 
   t_print("   OK: #{$ok_test}\n")

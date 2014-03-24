@@ -10,6 +10,8 @@ class Range
   #
   # ISO 15.2.14.4.4
   def each(&block)
+    return to_enum :each unless block_given?
+
     val = self.first
     unless val.respond_to? :succ
       raise TypeError, "can't iterate"
@@ -43,7 +45,6 @@ end
 # Range is enumerable
 #
 # ISO 15.2.14.3
-module Enumerable; end
 class Range
   include Enumerable
 end

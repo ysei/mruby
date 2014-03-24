@@ -19,7 +19,7 @@ void mrb_final_core(mrb_state*);
 static mrb_value
 inspect_main(mrb_state *mrb, mrb_value mod)
 {
-  return mrb_str_new(mrb, "main", 4);
+  return mrb_str_new_lit(mrb, "main");
 }
 
 mrb_state*
@@ -137,8 +137,8 @@ mrb_irep_free(mrb_state *mrb, mrb_irep *irep)
     mrb_free(mrb, irep->iseq);
   for (i=0; i<irep->plen; i++) {
     if (mrb_type(irep->pool[i]) == MRB_TT_STRING) {
-      if ((mrb_str_ptr(irep->pool[i])->flags & MRB_STR_NOFREE) == 0) {
-        mrb_free(mrb, mrb_str_ptr(irep->pool[i])->ptr);
+      if ((mrb_str_ptr(irep->pool[i])->flags & (MRB_STR_NOFREE|MRB_STR_EMBED)) == 0) {
+        mrb_free(mrb, RSTRING_PTR(irep->pool[i]));
       }
       mrb_free(mrb, mrb_obj_ptr(irep->pool[i]));
     }
@@ -165,24 +165,47 @@ mrb_str_pool(mrb_state *mrb, mrb_value str)
 {
   struct RString *s = mrb_str_ptr(str);
   struct RString *ns;
+  char *ptr;
   mrb_int len;
 
   ns = (struct RString *)mrb_malloc(mrb, sizeof(struct RString));
   ns->tt = MRB_TT_STRING;
   ns->c = mrb->string_class;
 
-  len = s->len;
-  ns->len = len;
   if (s->flags & MRB_STR_NOFREE) {
-    ns->ptr = s->ptr;
     ns->flags = MRB_STR_NOFREE;
+    ns->as.heap.ptr = s->as.heap.ptr;
+    ns->as.heap.len = s->as.heap.len;
+    ns->as.heap.aux.capa = 0;
   }
   else {
-    ns->ptr = (char *)mrb_malloc(mrb, (size_t)len+1);
-    if (s->ptr) {
-      memcpy(ns->ptr, s->ptr, len);
+    if (s->flags & MRB_STR_EMBED) {
+      ptr = s->as.ary;
+      len = (mrb_int)((s->flags & MRB_STR_EMBED_LEN_MASK) >> MRB_STR_EMBED_LEN_SHIFT);
     }
-    ns->ptr[len] = '\0';
+    else {
+      ptr = s->as.heap.ptr;
+      len = s->as.heap.len;
+    }
+
+    if (len < RSTRING_EMBED_LEN_MAX) {
+      ns->flags |= MRB_STR_EMBED;
+      ns->flags &= ~MRB_STR_EMBED_LEN_MASK;
+      ns->flags |= (size_t)len << MRB_STR_EMBED_LEN_SHIFT;
+      if (ptr) {
+        memcpy(ns->as.ary, ptr, len);
+      }
+      ns->as.ary[len] = '\0';
+    }
+    else {
+      ns->flags = 0;
+      ns->as.heap.ptr = (char *)mrb_malloc(mrb, (size_t)len+1);
+      ns->as.heap.len = len;
+      if (ptr) {
+        memcpy(ns->as.heap.ptr, ptr, len);
+      }
+      ns->as.heap.ptr[len] = '\0';
+    }
   }
   return mrb_obj_value(ns);
 }

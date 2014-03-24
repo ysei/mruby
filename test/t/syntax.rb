@@ -1,3 +1,12 @@
+assert('__FILE__') do
+  file = __FILE__
+  assert_true 'test/t/syntax.rb' == file || 'test\t\syntax.rb' == file
+end
+
+assert('__LINE__') do
+  assert_equal 7, __LINE__
+end
+
 assert('super', '11.3.4') do
   assert_raise NoMethodError do
     super

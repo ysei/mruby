@@ -39,14 +39,23 @@ module MRuby
         @name = name
         @initializer = block
         @version = "0.0.0"
+        @cxx_abi_enabled = false
         MRuby::Gem.current = self
+      end
+
+      def run_test_in_other_mrb_state?
+        not test_preload.nil? or not test_objs.empty?
+      end
+
+      def cxx_abi_enabled?
+        @cxx_abi_enabled
       end
 
       def setup
         MRuby::Gem.current = self
         @build.compilers.each do |compiler|
           compiler.include_paths << "#{dir}/include"
-        end
+        end if File.directory? "#{dir}/include"
         MRuby::Build::COMMANDS.each do |command|
           instance_variable_set("@#{command}", @build.send(command).clone)
         end
@@ -54,15 +63,17 @@ module MRuby
 
         @rbfiles = Dir.glob("#{dir}/mrblib/*.rb").sort
         @objs = Dir.glob("#{dir}/src/*.{c,cpp,cxx,m,asm,S}").map do |f|
+          @cxx_abi_enabled = true if f =~ /(cxx|cpp)$/
           objfile(f.relative_path_from(@dir).to_s.pathmap("#{build_dir}/%X"))
         end
         @objs << objfile("#{build_dir}/gem_init")
 
         @test_rbfiles = Dir.glob("#{dir}/test/*.rb")
         @test_objs = Dir.glob("#{dir}/test/*.{c,cpp,cxx,m,asm,S}").map do |f|
+          @cxx_abi_enabled = true if f =~ /(cxx|cpp)$/
           objfile(f.relative_path_from(dir).to_s.pathmap("#{build_dir}/%X"))
         end
-        @test_preload = 'test/assert.rb'
+        @test_preload = nil # 'test/assert.rb'
         @test_args = {}
 
         @bins = []

@@ -25,7 +25,7 @@ typedef khint_t khiter_t;
 
 #define UPPER_BOUND(x) ((x)>>2|(x)>>1)
 
-//extern uint8_t __m[];
+/* extern uint8_t __m[]; */
 
 /* mask for flags */
 static const uint8_t __m_empty[8]  = {0x02, 0x08, 0x20, 0x80};
@@ -100,7 +100,7 @@ kh_fill_flags(uint8_t *p, uint8_t c, size_t len)
     RWLOCK_WRLOCK_AND_DEFINE(mrb, h->lock);                             \
     khint_t sz = h->n_buckets;                                          \
     int len = sizeof(khkey_t) + (kh_is_map ? sizeof(khval_t) : 0);      \
-    uint8_t *p = mrb_malloc(mrb, sizeof(uint8_t)*sz/4+len*sz);          \
+    uint8_t *p = (uint8_t*)mrb_malloc(mrb, sizeof(uint8_t)*sz/4+len*sz); \
     h->size = h->n_occupied = 0;                                        \
     h->upper_bound = UPPER_BOUND(sz);                                   \
     h->keys = (khkey_t *)p;                                             \
@@ -135,6 +135,7 @@ kh_fill_flags(uint8_t *p, uint8_t c, size_t len)
   void kh_clear_##name(mrb_state *mrb, kh_##name##_t *h)                \
   {                                                                     \
     RWLOCK_WRLOCK_AND_DEFINE(mrb, h->lock);                             \
+    (void)mrb;                                                          \
     if (h && h->ed_flags) {                                             \
       kh_fill_flags(h->ed_flags, 0xaa, h->n_buckets/4);                 \
       h->size = h->n_occupied = 0;                                      \
@@ -145,6 +146,7 @@ kh_fill_flags(uint8_t *p, uint8_t c, size_t len)
   {                                                                     \
     RWLOCK_RDLOCK_AND_DEFINE(mrb, h->lock);                             \
     khint_t k = __hash_func(mrb,key) & (h->mask);                       \
+    (void)mrb;                                                          \
     while (!__ac_isempty(h->ed_flags, k)) {                             \
       if (!__ac_isdel(h->ed_flags, k)) {                                \
         if (__hash_equal(mrb,h->keys[k], key)) {                        \
@@ -213,6 +215,7 @@ kh_fill_flags(uint8_t *p, uint8_t c, size_t len)
   void kh_del_##name(mrb_state *mrb, kh_##name##_t *h, khint_t x)       \
   {                                                                     \
     RWLOCK_WRLOCK_AND_DEFINE(mrb, h->lock);                             \
+    (void)mrb;                                                          \
     h->ed_flags[x/4] |= __m_del[x%4];                                   \
     h->size--;                                                          \
     RWLOCK_UNLOCK_IF_LOCKED(mrb, h->lock);                              \
@@ -226,7 +229,7 @@ kh_fill_flags(uint8_t *p, uint8_t c, size_t len)
     for (k = kh_begin(h); k != kh_end(h); k++) {                        \
       if (kh_exist(h, k)) {                                             \
         k2 = kh_put_##name(mrb, h2, kh_key(h, k));                      \
-        if(kh_is_map) kh_value(h2, k2) = kh_value(h, k);                \
+        if (kh_is_map) kh_value(h2, k2) = kh_value(h, k);               \
       }                                                                 \
     }                                                                   \
     return h2;                                                          \

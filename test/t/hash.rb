@@ -12,6 +12,7 @@ end
 assert('Hash#==', '15.2.13.4.1') do
   assert_true({ 'abc' => 'abc' } == { 'abc' => 'abc' })
   assert_false({ 'abc' => 'abc' } ==  { 'cba' => 'cba' })
+  assert_true({ :equal => 1 } == { :equal => 1.0 })
 end
 
 assert('Hash#[]', '15.2.13.4.2') do
@@ -32,6 +33,13 @@ assert('Hash#clear', '15.2.13.4.4') do
   a.clear
 
   assert_equal({ }, a)
+end
+
+assert('Hash#dup') do
+  a = { 'a' => 1 }
+  b = a.dup
+  a['a'] = 2
+  assert_equal(b, {'a' => 1})
 end
 
 assert('Hash#default', '15.2.13.4.5') do
@@ -227,8 +235,15 @@ assert('Hash#shift', '15.2.13.4.24') do
   a = { 'abc_key' => 'abc_value', 'cba_key' => 'cba_value' }
   b = a.shift
 
-  assert_equal({ 'abc_key' => 'abc_value' }, a)
-  assert_equal [ 'cba_key', 'cba_value' ], b
+  assert_equal Array, b.class
+  assert_equal 2, b.size
+  assert_equal 1, a.size
+
+  b = a.shift
+
+  assert_equal Array, b.class
+  assert_equal 2, b.size
+  assert_equal 0, a.size
 end
 
 assert('Hash#size', '15.2.13.4.25') do
@@ -261,6 +276,14 @@ assert('Hash#values', '15.2.13.4.28') do
 end
 
 # Not ISO specified
+
+assert('Hash#eql?') do
+  a = { 'a' => 1, 'b' => 2, 'c' => 3 }
+  b = { 'a' => 1, 'b' => 2, 'c' => 3 }
+  c = { 'a' => 1.0, 'b' => 2, 'c' => 3 }
+  assert_true(a.eql?(b))
+  assert_false(a.eql?(c))
+end
 
 assert('Hash#reject') do
   h = {:one => 1, :two => 2, :three => 3, :four => 4}

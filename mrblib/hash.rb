@@ -43,7 +43,9 @@ class Hash
   #
   # ISO 15.2.13.4.9
   def each(&block)
-    self.keys.each{|k| block.call([k, self[k]])}
+    return to_enum :each unless block_given?
+
+    self.keys.each { |k| block.call [k, self[k]] }
     self
   end
 
@@ -67,6 +69,8 @@ class Hash
   #
   # ISO 15.2.13.4.10
   def each_key(&block)
+    return to_enum :each_key unless block_given?
+
     self.keys.each{|k| block.call(k)}
     self
   end
@@ -91,6 +95,8 @@ class Hash
   #
   # ISO 15.2.13.4.11
   def each_value(&block)
+    return to_enum :each_value unless block_given?
+
     self.keys.each{|k| block.call(self[k])}
     self
   end
@@ -128,10 +134,12 @@ class Hash
 
   # 1.8/1.9 Hash#reject! returns Hash; ISO says nothing.
   def reject!(&b)
+    return to_enum :reject! unless block_given?
+
     keys = []
     self.each_key{|k|
       v = self[k]
-      if b.call(k, v)
+      if b.call([k, v])
         keys.push(k)
       end
     }
@@ -144,10 +152,12 @@ class Hash
 
   # 1.8/1.9 Hash#reject returns Hash; ISO says nothing.
   def reject(&b)
+    return to_enum :reject unless block_given?
+
     h = {}
     self.each_key{|k|
       v = self[k]
-      unless b.call(k, v)
+      unless b.call([k, v])
         h[k] = v
       end
     }
@@ -156,10 +166,12 @@ class Hash
 
   # 1.9 Hash#select! returns Hash; ISO says nothing.
   def select!(&b)
+    return to_enum :select! unless block_given?
+
     keys = []
     self.each_key{|k|
       v = self[k]
-      unless b.call(k, v)
+      unless b.call([k, v])
         keys.push(k)
       end
     }
@@ -172,14 +184,21 @@ class Hash
 
   # 1.9 Hash#select returns Hash; ISO says nothing.
   def select(&b)
+    return to_enum :select unless block_given?
+
     h = {}
     self.each_key{|k|
       v = self[k]
-      if b.call(k, v)
+      if b.call([k, v])
         h[k] = v
       end
     }
     h
+  end
+
+  def __update(h)
+    h.each_key{|k| self[k] = h[k]}
+    self
   end
 end
 
@@ -187,7 +206,6 @@ end
 # Hash is enumerable
 #
 # ISO 15.2.13.3
-module Enumerable; end
 class Hash
   include Enumerable
 end

@@ -67,10 +67,12 @@ module Integral
   # Calls the given block +self+ times.
   #
   # ISO 15.2.8.3.22
-  def times(&block)
+  def times &block
+    return to_enum :times unless block_given?
+
     i = 0
-    while(i < self)
-      block.call(i)
+    while i < self
+      block.call i
       i += 1
     end
     self
@@ -160,8 +162,5 @@ class Float
       n *= 2
     }
     n.to_i
-  end
-
-  def divmod(other)
   end
 end
