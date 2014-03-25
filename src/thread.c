@@ -211,6 +211,7 @@ mrb_vm_thread_open(mrb_state *mrb)
   thread_mrb->arena = (struct RBasic**)mrb_malloc(mrb, sizeof(struct RBasic*)*MRB_GC_ARENA_SIZE);
   thread_mrb->arena_capa = MRB_GC_ARENA_SIZE;
 #endif
+  thread_mrb->arena_idx = 0;
 
   thread_mrb->c = (struct mrb_context*)mrb_malloc(mrb, sizeof(struct mrb_context));
   *thread_mrb->c = mrb_context_zero;
