@@ -442,9 +442,9 @@ mrb_obj_alloc(mrb_state *mrb, enum mrb_vtype ttype, struct RClass *cls)
   mrb->heaps->free_heaps->freelist = ((struct free_obj*)p)->next;
   if (mrb->heaps->free_heaps->freelist == NULL)
     unlink_free_heap_page(mrb, mrb->heaps->free_heaps);
+  mrb->heaps->live++;
   MRB_VM_HEAP_UNLOCK_IF_LOCKED(mrb);
 
-  mrb->heaps->live++;
   gc_protect(mrb, p);
   *(RVALUE *)p = RVALUE_zero;
   p->tt = ttype;
@@ -724,10 +724,35 @@ root_scan_phase(mrb_state *mrb)
   }
 
   mrb_gc_mark_gv(mrb);
+
+#ifndef ENABLE_THREAD
   /* mark arena */
   for (i=0,e=mrb->arena_idx; i<e; i++) {
     mrb_gc_mark(mrb, mrb->arena[i]);
   }
+#else
+  RWLOCK_RDLOCK_AND_DEFINE(mrb, mrb->lock_thread);
+  if (mrb->thread_table) {
+    size_t const n = mrb->thread_table->count;
+    for (i = 0; i < n; ++i) {
+      mrb_thread_t *entry = &mrb->thread_table->threads[i];
+      if (entry->mrb == NULL) {
+        continue;
+      }
+      /* mark arena */
+      size_t j;
+      for (j = 0, e = mrb->arena_idx; j < e; ++j) {
+        mrb_gc_mark(entry->mrb, entry->mrb->arena[j]);
+      }
+    }
+  } else {
+    for (i = 0, e = mrb->arena_idx; i < e; i++) {
+      mrb_gc_mark(mrb, mrb->arena[i]);
+    }
+  }
+  RWLOCK_UNLOCK_IF_LOCKED(mrb, mrb->lock_thread);
+#endif
+
   /* mark class hierarchy */
   mrb_gc_mark(mrb, (struct RBasic*)mrb->object_class);
   /* mark top_self */
@@ -744,7 +769,7 @@ root_scan_phase(mrb_state *mrb)
     mark_context(mrb, mrb->c);
   }
 #else
-  RWLOCK_RDLOCK_AND_DEFINE(mrb, mrb->lock_thread);
+  RWLOCK_RDLOCK(mrb, mrb->lock_thread);
   if (mrb->thread_table) {
     size_t const n = mrb->thread_table->count;
     for (i = 0; i < n; ++i) {
@@ -752,6 +777,7 @@ root_scan_phase(mrb_state *mrb)
       if (entry->mrb == NULL) {
         continue;
       }
+      /* mark stack */
       mark_context(entry->mrb, entry->mrb->root_c);
       if (entry->mrb->root_c->fib) {
         mrb_gc_mark(mrb, (struct RBasic*)entry->mrb->root_c->fib);
@@ -759,6 +785,14 @@ root_scan_phase(mrb_state *mrb)
       if (entry->mrb->root_c != entry->mrb->c) {
         mark_context(entry->mrb, entry->mrb->c);
       }
+    }
+  } else {
+    mark_context(mrb, mrb->root_c);
+    if (mrb->root_c->fib) {
+      mrb_gc_mark(mrb, (struct RBasic*)mrb->root_c->fib);
+    }
+    if (mrb->root_c != mrb->c) {
+      mark_context(mrb, mrb->c);
     }
   }
   RWLOCK_UNLOCK_IF_LOCKED(mrb, mrb->lock_thread);
