@@ -70,6 +70,7 @@ mrb_proc_new_cfunc(mrb_state *mrb, mrb_func_t func)
   p = (struct RProc*)mrb_obj_alloc(mrb, MRB_TT_PROC, mrb->proc_class);
   p->body.func = func;
   p->flags |= MRB_PROC_CFUNC;
+  p->env = 0;
 
   return p;
 }
@@ -194,9 +195,6 @@ mrb_init_proc(mrb_state *mrb)
   struct RProc *m;
   mrb_irep *call_irep = (mrb_irep *)mrb_malloc(mrb, sizeof(mrb_irep));
   static const mrb_irep mrb_irep_zero = { 0 };
-
-  if (call_irep == NULL)
-    return;
 
   *call_irep = mrb_irep_zero;
   call_irep->flags = MRB_ISEQ_NO_FREE;

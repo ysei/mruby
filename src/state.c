@@ -100,7 +100,6 @@ mrb_alloca(mrb_state *mrb, size_t size)
   struct alloca_header *p;
 
   p = (struct alloca_header*) mrb_malloc(mrb, sizeof(struct alloca_header)+size);
-  if (p == NULL) return NULL;
   p->next = mrb->mems;
   mrb->mems = p;
   return (void*)p->buf;
@@ -220,6 +219,7 @@ mrb_str_pool(mrb_state *mrb, mrb_value str)
       ns->flags = 0;
       ns->as.heap.ptr = (char *)mrb_malloc(mrb, (size_t)len+1);
       ns->as.heap.len = len;
+      ns->as.heap.aux.capa = len;
       if (ptr) {
         memcpy(ns->as.heap.ptr, ptr, len);
       }

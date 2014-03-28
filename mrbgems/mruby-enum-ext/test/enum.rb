@@ -122,3 +122,25 @@ assert("Enumerable#reverse_each") do
   assert_equal (1..3), r.reverse_each { |v| a << v }
   assert_equal [3, 2, 1], a
 end
+
+assert("Enumerable#cycle") do
+  a = []
+  ["a", "b", "c"].cycle(2) { |v| a << v }
+  assert_equal ["a", "b", "c", "a", "b", "c"], a
+  assert_raise(TypeError) { ["a", "b", "c"].cycle("a") { |v| a << v } }
+end
+
+assert("Enumerable#find_index") do
+  assert_nil (1..10).find_index { |i| i % 5 == 0 and i % 7 == 0 }
+  assert_equal 34, (1..100).find_index { |i| i % 5 == 0 and i % 7 == 0 }
+  assert_equal 49 ,(1..100).find_index(50)
+end
+
+assert("Enumerable#zip") do
+  a = [ 4, 5, 6 ]
+  b = [ 7, 8, 9 ]
+  assert_equal [[4, 7], [5, 8], [6, 9]], a.zip(b)
+  assert_equal [[1, 4, 7], [2, 5, 8], [3, 6, 9]], [1, 2, 3].zip(a, b)
+  assert_equal [[1, 4, 7], [2, 5, 8]], [1, 2].zip(a, b)
+  assert_equal [[4, 1, 8], [5, 2, nil], [6, nil, nil]], a.zip([1, 2], [8])
+end
