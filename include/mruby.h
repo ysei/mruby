@@ -189,20 +189,6 @@ typedef struct mrb_state {
   void *ud; /* auxiliary data */
 } mrb_state;
 
-static inline int mrb_gc_ctx_get_current_white_part(mrb_state *mrb) {
-  int current_white_part;
-  MRB_VM_GC_RDLOCK_AND_DEFINE(mrb);
-  current_white_part = mrb->gc_context->current_white_part;
-  MRB_VM_GC_UNLOCK_IF_LOCKED(mrb);
-  return current_white_part;
-}
-
-static inline void mrb_gc_ctx_set_current_white_part(mrb_state *mrb, int value) {
-  MRB_VM_GC_WRLOCK_AND_DEFINE(mrb);
-  mrb->gc_context->current_white_part = value;
-  MRB_VM_GC_UNLOCK_IF_LOCKED(mrb);
-}
-
 typedef mrb_value (*mrb_func_t)(mrb_state *mrb, mrb_value);
 struct RClass *mrb_define_class(mrb_state *, const char*, struct RClass*);
 struct RClass *mrb_define_module(mrb_state *, const char*);
@@ -329,8 +315,9 @@ void mrb_incremental_gc(mrb_state *);
 int mrb_gc_arena_save(mrb_state*);
 void mrb_gc_arena_restore(mrb_state*,int);
 void mrb_gc_mark(mrb_state*,struct RBasic*);
+void mrb_gc_mark_internal(mrb_state *mrb, struct RBasic *obj);
 #define mrb_gc_mark_value(mrb,val) do {\
-  if (mrb_type(val) >= MRB_TT_HAS_BASIC) mrb_gc_mark((mrb), mrb_basic_ptr(val));\
+  if (mrb_type(val) >= MRB_TT_HAS_BASIC) mrb_gc_mark_internal((mrb), mrb_basic_ptr(val));\
 } while (0)
 void mrb_field_write_barrier(mrb_state *, struct RBasic*, struct RBasic*);
 #define mrb_field_write_barrier_value(mrb, obj, val) do{\

@@ -17,6 +17,7 @@ mrb_default_deadlock_handler(mrb_state *mrb, mrb_rwlock_t *lock)
     stderr,
     "BUG: Deadlock is detected (Lock: %p)\n", lock);
 #endif
+  __builtin_trap();
 }
 
 int
@@ -273,21 +274,17 @@ mrb_vm_attach_thread(mrb_state *mrb, mrb_thread_t *thread)
     return FALSE;
   }
 
-  RWLOCK_RDLOCK_AND_DEFINE(mrb, mrb->lock_thread);
+  MRB_VM_GC_WRLOCK_AND_DEFINE(mrb);
 
   if (!mrb->thread_table) {
-    RWLOCK_UNLOCK_IF_LOCKED(mrb, mrb->lock_thread);
-    RWLOCK_WRLOCK(mrb, mrb->lock_thread);
     mrb->thread_table = (mrb_thread_table_t*)mrb_malloc(mrb, sizeof(mrb_thread_table_t));
     if (NULL == mrb->thread_table) {
-      RWLOCK_UNLOCK(mrb, mrb->lock_thread);
+      MRB_VM_GC_UNLOCK_IF_LOCKED(mrb);
       return FALSE;
     }
     mrb->thread_table->capacity = 0;
     mrb->thread_table->count    = 0;
     mrb->thread_table->threads  = NULL;
-    RWLOCK_UNLOCK_IF_LOCKED(mrb, mrb->lock_thread);
-    RWLOCK_RDLOCK(mrb, mrb->lock_thread);
   }
 
   mrb_thread_t *entry = NULL;
@@ -299,26 +296,21 @@ mrb_vm_attach_thread(mrb_state *mrb, mrb_thread_t *thread)
       mrb_thread_t *t = &mrb->thread_table->threads[i];
       if (THREAD_EQUALS(mrb, THREAD_GET_SELF(mrb), t->thread)) {
         *thread = mrb->thread_table->threads[i];
-        RWLOCK_UNLOCK_IF_LOCKED(mrb, mrb->lock_thread);
+        MRB_VM_GC_UNLOCK_IF_LOCKED(mrb);
         return TRUE;
       }
       continue;
     }
-    RWLOCK_UNLOCK_IF_LOCKED(mrb, mrb->lock_thread);
-    RWLOCK_WRLOCK(mrb, mrb->lock_thread);
     if (mrb->thread_table->threads[i].mrb != NULL) {
-      RWLOCK_UNLOCK_IF_LOCKED(mrb, mrb->lock_thread);
-      RWLOCK_RDLOCK(mrb, mrb->lock_thread);
       continue;
     }
     entry = &mrb->thread_table->threads[i];
     mrb->thread_table->count += 1;
-    RWLOCK_UNLOCK_IF_LOCKED(mrb, mrb->lock_thread);
     break;
   }
 
   if (entry == NULL) {
-    RWLOCK_UNLOCK_IF_LOCKED(mrb, mrb->lock_thread);
+    MRB_VM_GC_UNLOCK_IF_LOCKED(mrb);
     return FALSE;
   }
 
@@ -326,57 +318,67 @@ mrb_vm_attach_thread(mrb_state *mrb, mrb_thread_t *thread)
   entry->thread = THREAD_GET_SELF(entry->mrb);
 
   if (entry->mrb == NULL) {
+    MRB_VM_GC_UNLOCK_IF_LOCKED(mrb);
     return FALSE;
   }
 
   *thread = *entry;
 
+  MRB_VM_GC_UNLOCK_IF_LOCKED(mrb);
+
   return TRUE;
 }
 
-void
+mrb_value
 mrb_vm_detach_thread(mrb_state *mrb, mrb_thread_t *thread)
 {
   if (thread == NULL) {
-    return;
+    return mrb_nil_value();
   }
-
-  mrb_thread_t entry = { NULL, NULL };
-
-  RWLOCK_RDLOCK_AND_DEFINE(mrb, mrb->lock_thread);
 
   if (!mrb->thread_table) {
-    RWLOCK_UNLOCK_IF_LOCKED(mrb, mrb->lock_thread);
-    return;
-  }
-  if (!mrb->thread_table->threads) {
-    RWLOCK_UNLOCK_IF_LOCKED(mrb, mrb->lock_thread);
-    return;
+    return mrb_nil_value();
   }
 
+  MRB_VM_GC_WRLOCK_AND_DEFINE(mrb);
+
+  if (!mrb->thread_table) {
+    MRB_VM_GC_UNLOCK_IF_LOCKED(mrb);
+    return mrb_nil_value();
+  }
+
+  if (!mrb->thread_table->threads) {
+    MRB_VM_GC_UNLOCK_IF_LOCKED(mrb);
+    return mrb_nil_value();
+  }
+
+  mrb_thread_t entry = MRB_THREAD_INITIALIZER;
   size_t i;
   size_t const capacity = mrb->thread_table->capacity;
   for (i = 0; i < capacity; ++i) {
     if (mrb->thread_table->threads[i].mrb != thread->mrb) {
       continue;
     }
-    RWLOCK_UNLOCK_IF_LOCKED(mrb, mrb->lock_thread);
-    RWLOCK_WRLOCK(mrb, mrb->lock_thread);
     if (mrb->thread_table->threads[i].mrb == NULL) {
-      RWLOCK_UNLOCK_IF_LOCKED(mrb, mrb->lock_thread);
-      RWLOCK_RDLOCK(mrb, mrb->lock_thread);
       continue;
     }
     entry = mrb->thread_table->threads[i];
+    mrb_gc_protect(mrb, entry.retval);
     mrb->thread_table->threads[i].mrb = NULL;
     mrb->thread_table->threads[i].thread = NULL;
+    mrb->thread_table->threads[i].retval = mrb_nil_value();
     mrb->thread_table->count -= 1;
-    RWLOCK_UNLOCK_IF_LOCKED(mrb, mrb->lock_thread);
     break;
   }
 
-  THREAD_FREE(entry.mrb, entry.thread);
-  mrb_vm_thread_close(entry.mrb);
+  if (entry.mrb != NULL) {
+    THREAD_FREE(entry.mrb, entry.thread);
+    mrb_vm_thread_close(entry.mrb);
+  }
+
+  MRB_VM_GC_UNLOCK_IF_LOCKED(mrb);
+
+  return entry.retval;
 }
 
 void

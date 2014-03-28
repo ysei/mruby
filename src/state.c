@@ -67,10 +67,11 @@ mrb_open_allocf(mrb_allocf f, void *ud)
   mrb->thread_table->capacity = MRB_VM_THREAD_DEFAULT_CAPACITY;
   mrb->thread_table->count    = 1;
   mrb->thread_table->threads  = (mrb_thread_t*)mrb_malloc(mrb, sizeof(mrb_thread_t) * MRB_VM_THREAD_DEFAULT_CAPACITY);
-  mrb->thread_table->threads[0] = (mrb_thread_t){ mrb, NULL };
+  mrb->thread_table->threads[0] = MRB_THREAD_INITIALIZER;
+  mrb->thread_table->threads[0].mrb = mrb;
   size_t i = 0;
   for (i = 1; i < MRB_VM_THREAD_DEFAULT_CAPACITY; ++i) {
-    mrb->thread_table->threads[i] = (mrb_thread_t){ NULL, NULL };
+    mrb->thread_table->threads[i] = MRB_THREAD_INITIALIZER;
   }
 #endif
 

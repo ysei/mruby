@@ -169,13 +169,13 @@ mrb_realloc_simple(mrb_state *mrb, void *p,  size_t len)
   void *p2;
 
   p2 = (mrb->allocf)(mrb, p, len, mrb->ud);
-  MRB_VM_HEAP_RDLOCK_AND_DEFINE(mrb);
+  MRB_VM_GC_RDLOCK_AND_DEFINE(mrb);
   if (!p2 && len > 0 && mrb->heaps->heaps) {
-    MRB_VM_HEAP_UNLOCK_IF_LOCKED(mrb);
+    MRB_VM_GC_UNLOCK_IF_LOCKED(mrb);
     mrb_full_gc(mrb);
     p2 = (mrb->allocf)(mrb, p, len, mrb->ud);
   } else {
-    MRB_VM_HEAP_UNLOCK_IF_LOCKED(mrb);
+    MRB_VM_GC_UNLOCK_IF_LOCKED(mrb);
   }
 
   return p2;
@@ -268,12 +268,12 @@ struct heap_page {
 static void
 link_heap_page(mrb_state *mrb, struct heap_page *page)
 {
-  MRB_VM_HEAP_WRLOCK_AND_DEFINE(mrb);
+  MRB_VM_GC_WRLOCK_AND_DEFINE(mrb);
   page->next = mrb->heaps->heaps;
   if (mrb->heaps->heaps)
     mrb->heaps->heaps->prev = page;
   mrb->heaps->heaps = page;
-  MRB_VM_HEAP_UNLOCK_IF_LOCKED(mrb);
+  MRB_VM_GC_UNLOCK_IF_LOCKED(mrb);
 }
 
 static void
@@ -284,10 +284,8 @@ unlink_heap_page(mrb_state *mrb, struct heap_page *page)
   if (page->next)
     page->next->prev = page->prev;
 
-  MRB_VM_HEAP_WRLOCK_AND_DEFINE(mrb);
   if (mrb->heaps->heaps == page)
     mrb->heaps->heaps = page->next;
-  MRB_VM_HEAP_UNLOCK_IF_LOCKED(mrb);
 
   page->prev = NULL;
   page->next = NULL;
@@ -347,7 +345,6 @@ add_heap(mrb_state *mrb)
 void
 mrb_init_heap(mrb_state *mrb)
 {
-  MRB_VM_HEAP_WRLOCK_AND_DEFINE(mrb);
   mrb->heaps = mrb_malloc(mrb, sizeof(mrb_heaps));
   mrb->heaps->heaps = NULL;
   mrb->heaps->free_heaps = NULL;
@@ -362,7 +359,6 @@ mrb_init_heap(mrb_state *mrb)
 #ifdef GC_PROFILE
   program_invoke_time = gettimeofday_time();
 #endif
-  MRB_VM_HEAP_UNLOCK_IF_LOCKED(mrb);
 }
 
 static void obj_free(mrb_state *mrb, struct RBasic *obj);
@@ -423,33 +419,35 @@ mrb_obj_alloc(mrb_state *mrb, enum mrb_vtype ttype, struct RClass *cls)
   struct RBasic *p;
   static const RVALUE RVALUE_zero = { { { MRB_TT_FALSE } } };
 
+  MRB_VM_GC_WRLOCK_AND_DEFINE(mrb);
+
 #ifdef MRB_GC_STRESS
   mrb_full_gc(mrb);
 #endif
   if (mrb->gc_context->gc_threshold < mrb->heaps->live) {
+    MRB_VM_GC_UNLOCK_IF_LOCKED(mrb);
     mrb_incremental_gc(mrb);
+    MRB_VM_GC_WRLOCK(mrb);
   }
-  MRB_VM_HEAP_RDLOCK_AND_DEFINE(mrb);
   if (mrb->heaps->free_heaps == NULL) {
-    MRB_VM_HEAP_UNLOCK_IF_LOCKED(mrb);
+    MRB_VM_GC_UNLOCK_IF_LOCKED(mrb);
     add_heap(mrb);
-  } else {
-    MRB_VM_HEAP_UNLOCK_IF_LOCKED(mrb);
+    MRB_VM_GC_WRLOCK(mrb);
   }
 
-  MRB_VM_HEAP_WRLOCK(mrb);
   p = mrb->heaps->free_heaps->freelist;
   mrb->heaps->free_heaps->freelist = ((struct free_obj*)p)->next;
   if (mrb->heaps->free_heaps->freelist == NULL)
     unlink_free_heap_page(mrb, mrb->heaps->free_heaps);
   mrb->heaps->live++;
-  MRB_VM_HEAP_UNLOCK_IF_LOCKED(mrb);
 
   gc_protect(mrb, p);
   *(RVALUE *)p = RVALUE_zero;
   p->tt = ttype;
   p->c = cls;
   paint_partial_white(mrb, p);
+
+  MRB_VM_GC_UNLOCK_IF_LOCKED(mrb);
   return p;
 }
 
@@ -461,13 +459,19 @@ add_gray_list(mrb_state *mrb, struct RBasic *obj)
     abort();
   }
 #endif
-  MRB_VM_GC_WRLOCK_AND_DEFINE(mrb);
 
   paint_gray(obj);
   obj->gcnext = mrb->gc_context->gray_list;
   mrb->gc_context->gray_list = obj;
+}
 
-  MRB_VM_GC_UNLOCK_IF_LOCKED(mrb);
+void
+mrb_gc_mark_internal(mrb_state *mrb, struct RBasic *obj)
+{
+  if (obj == 0) return;
+  if (!is_white(obj)) return;
+  mrb_assert((obj)->tt != MRB_TT_FREE);
+  add_gray_list(mrb, obj);
 }
 
 static void
@@ -497,19 +501,19 @@ mark_context(mrb_state *mrb, struct mrb_context *c)
   /* mark ensure stack */
   e = (c->ci) ? c->ci->eidx : 0;
   for (i=0; i<e; i++) {
-    mrb_gc_mark(mrb, (struct RBasic*)c->ensure[i]);
+    mrb_gc_mark_internal(mrb, (struct RBasic*)c->ensure[i]);
   }
   /* mark VM stack */
   if (c->cibase) {
     for (ci = c->cibase; ci <= c->ci; ci++) {
-      mrb_gc_mark(mrb, (struct RBasic*)ci->env);
-      mrb_gc_mark(mrb, (struct RBasic*)ci->proc);
-      mrb_gc_mark(mrb, (struct RBasic*)ci->target_class);
+      mrb_gc_mark_internal(mrb, (struct RBasic*)ci->env);
+      mrb_gc_mark_internal(mrb, (struct RBasic*)ci->proc);
+      mrb_gc_mark_internal(mrb, (struct RBasic*)ci->target_class);
     }
   }
   /* mark fibers */
   if (c->prev && c->prev->fib) {
-    mrb_gc_mark(mrb, (struct RBasic*)c->prev->fib);
+    mrb_gc_mark_internal(mrb, (struct RBasic*)c->prev->fib);
   }
 }
 
@@ -519,10 +523,10 @@ gc_mark_children(mrb_state *mrb, struct RBasic *obj)
   mrb_assert(is_gray(obj));
   paint_black(obj);
   mrb->gc_context->gray_list = obj->gcnext;
-  mrb_gc_mark(mrb, (struct RBasic*)obj->c);
+  mrb_gc_mark_internal(mrb, (struct RBasic*)obj->c);
   switch (obj->tt) {
   case MRB_TT_ICLASS:
-    mrb_gc_mark(mrb, (struct RBasic*)((struct RClass*)obj)->super);
+    mrb_gc_mark_internal(mrb, (struct RBasic*)((struct RClass*)obj)->super);
     break;
 
   case MRB_TT_CLASS:
@@ -532,7 +536,7 @@ gc_mark_children(mrb_state *mrb, struct RBasic *obj)
       struct RClass *c = (struct RClass*)obj;
 
       mrb_gc_mark_mt(mrb, c);
-      mrb_gc_mark(mrb, (struct RBasic*)c->super);
+      mrb_gc_mark_internal(mrb, (struct RBasic*)c->super);
     }
     /* fall through */
 
@@ -545,8 +549,8 @@ gc_mark_children(mrb_state *mrb, struct RBasic *obj)
     {
       struct RProc *p = (struct RProc*)obj;
 
-      mrb_gc_mark(mrb, (struct RBasic*)p->env);
-      mrb_gc_mark(mrb, (struct RBasic*)p->target_class);
+      mrb_gc_mark_internal(mrb, (struct RBasic*)p->env);
+      mrb_gc_mark_internal(mrb, (struct RBasic*)p->target_class);
     }
     break;
 
@@ -611,10 +615,9 @@ gc_mark_children(mrb_state *mrb, struct RBasic *obj)
 void
 mrb_gc_mark(mrb_state *mrb, struct RBasic *obj)
 {
-  if (obj == 0) return;
-  if (!is_white(obj)) return;
-  mrb_assert((obj)->tt != MRB_TT_FREE);
-  add_gray_list(mrb, obj);
+  MRB_VM_GC_WRLOCK_AND_DEFINE(mrb);
+  mrb_gc_mark_internal(mrb, obj);
+  MRB_VM_GC_UNLOCK_IF_LOCKED(mrb);
 }
 
 static void
@@ -728,10 +731,9 @@ root_scan_phase(mrb_state *mrb)
 
   /* mark arena */
   for (i=0,e=mrb->arena_idx; i<e; i++) {
-    mrb_gc_mark(mrb, mrb->arena[i]);
+    mrb_gc_mark_internal(mrb, mrb->arena[i]);
   }
 #else
-  RWLOCK_RDLOCK_AND_DEFINE(mrb, mrb->lock_thread);
   if (mrb->thread_table) {
     size_t const n = mrb->thread_table->capacity;
     for (i = 0; i < n; ++i) {
@@ -753,29 +755,27 @@ root_scan_phase(mrb_state *mrb)
 
     /* mark arena */
     for (i = 0, e = mrb->arena_idx; i < e; i++) {
-      mrb_gc_mark(mrb, mrb->arena[i]);
+      mrb_gc_mark_internal(mrb, mrb->arena[i]);
     }
   }
-  RWLOCK_UNLOCK_IF_LOCKED(mrb, mrb->lock_thread);
 #endif
 
   /* mark class hierarchy */
-  mrb_gc_mark(mrb, (struct RBasic*)mrb->object_class);
+  mrb_gc_mark_internal(mrb, (struct RBasic*)mrb->object_class);
   /* mark top_self */
-  mrb_gc_mark(mrb, (struct RBasic*)mrb->top_self);
+  mrb_gc_mark_internal(mrb, (struct RBasic*)mrb->top_self);
   /* mark exception */
-  mrb_gc_mark(mrb, (struct RBasic*)mrb->exc);
+  mrb_gc_mark_internal(mrb, (struct RBasic*)mrb->exc);
 
 #ifndef ENABLE_THREAD
   mark_context(mrb, mrb->root_c);
   if (mrb->root_c->fib) {
-    mrb_gc_mark(mrb, (struct RBasic*)mrb->root_c->fib);
+    mrb_gc_mark_internal(mrb, (struct RBasic*)mrb->root_c->fib);
   }
   if (mrb->root_c != mrb->c) {
     mark_context(mrb, mrb->c);
   }
 #else
-  RWLOCK_RDLOCK(mrb, mrb->lock_thread);
   if (mrb->thread_table) {
     size_t const n = mrb->thread_table->capacity;
     for (i = 0; i < n; ++i) {
@@ -791,17 +791,19 @@ root_scan_phase(mrb_state *mrb)
       if (entry->mrb->root_c != entry->mrb->c) {
         mark_context(entry->mrb, entry->mrb->c);
       }
+      if (!mrb_nil_p(entry->retval)) {
+        mrb_gc_mark(entry->mrb, mrb_basic_ptr(entry->retval));
+      }
     }
   } else {
     mark_context(mrb, mrb->root_c);
     if (mrb->root_c->fib) {
-      mrb_gc_mark(mrb, (struct RBasic*)mrb->root_c->fib);
+      mrb_gc_mark_internal(mrb, (struct RBasic*)mrb->root_c->fib);
     }
     if (mrb->root_c != mrb->c) {
       mark_context(mrb, mrb->c);
     }
   }
-  RWLOCK_UNLOCK_IF_LOCKED(mrb, mrb->lock_thread);
 #endif
 }
 
@@ -964,7 +966,6 @@ incremental_sweep_phase(mrb_state *mrb, size_t limit)
       p++;
     }
 
-    MRB_VM_HEAP_WRLOCK_AND_DEFINE(mrb);
     /* free dead slot */
     if (dead_slot && freed < MRB_HEAP_PAGE_SIZE) {
       struct heap_page *next = page->next;
@@ -987,7 +988,6 @@ incremental_sweep_phase(mrb_state *mrb, size_t limit)
     tried_sweep += MRB_HEAP_PAGE_SIZE;
     mrb->heaps->live -= freed;
     mrb->gc_context->gc_live_after_mark -= freed;
-    MRB_VM_HEAP_UNLOCK_IF_LOCKED(mrb);
   }
   mrb->heaps->sweeps = page;
   return tried_sweep;
@@ -996,24 +996,20 @@ incremental_sweep_phase(mrb_state *mrb, size_t limit)
 static size_t
 incremental_gc(mrb_state *mrb, size_t limit)
 {
-  MRB_VM_GC_WRLOCK_AND_DEFINE(mrb);
   switch (mrb->gc_context->gc_state) {
   case GC_STATE_NONE:
     root_scan_phase(mrb);
     mrb->gc_context->gc_state = GC_STATE_MARK;
     flip_white_part(mrb);
-    MRB_VM_GC_UNLOCK_IF_LOCKED(mrb);
     return 0;
   case GC_STATE_MARK:
     if (mrb->gc_context->gray_list) {
       size_t const marked = incremental_marking_phase(mrb, limit);
-      MRB_VM_GC_UNLOCK_IF_LOCKED(mrb);
       return marked;
     }
     else {
       final_marking_phase(mrb);
       prepare_incremental_sweep(mrb);
-      MRB_VM_GC_UNLOCK_IF_LOCKED(mrb);
       return 0;
     }
   case GC_STATE_SWEEP: {
@@ -1021,11 +1017,9 @@ incremental_gc(mrb_state *mrb, size_t limit)
      tried_sweep = incremental_sweep_phase(mrb, limit);
      if (tried_sweep == 0)
        mrb->gc_context->gc_state = GC_STATE_NONE;
-     MRB_VM_GC_UNLOCK_IF_LOCKED(mrb);
      return tried_sweep;
   }
   default:
-    MRB_VM_GC_UNLOCK_IF_LOCKED(mrb);
     /* unknown state */
     mrb_assert(0);
     return 0;
@@ -1079,15 +1073,12 @@ clear_all_old(mrb_state *mrb)
 void
 mrb_incremental_gc(mrb_state *mrb)
 {
-  MRB_VM_GC_RDLOCK_AND_DEFINE(mrb);
+  MRB_VM_GC_WRLOCK_AND_DEFINE(mrb);
 
   if (mrb->gc_context->gc_disabled) {
     MRB_VM_GC_UNLOCK_IF_LOCKED(mrb);
     return;
   }
-
-  MRB_VM_GC_UNLOCK_IF_LOCKED(mrb);
-  MRB_VM_GC_WRLOCK(mrb);
 
   GC_INVOKE_TIME_REPORT("mrb_incremental_gc()");
   GC_TIME_START;

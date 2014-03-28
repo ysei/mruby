@@ -164,33 +164,39 @@ kh_fill_flags(uint8_t *p, uint8_t c, size_t len)
   {                                                                     \
     if (new_n_buckets < KHASH_MIN_SIZE)                                 \
       new_n_buckets = KHASH_MIN_SIZE;                                   \
-    RWLOCK_WRLOCK_AND_DEFINE(mrb, h->lock);                             \
     khash_power2(new_n_buckets);                                        \
     {                                                                   \
+      RWLOCK_WRLOCK_AND_DEFINE(mrb, h->lock);                           \
       uint8_t *old_ed_flags = h->ed_flags;                              \
       khkey_t *old_keys = h->keys;                                      \
       khval_t *old_vals = h->vals;                                      \
       khint_t old_n_buckets = h->n_buckets;                             \
       khint_t i;                                                        \
       h->n_buckets = new_n_buckets;                                     \
+      RWLOCK_UNLOCK_IF_LOCKED(mrb, h->lock);                            \
       kh_alloc_##name(mrb, h);                                          \
+      RWLOCK_WRLOCK(mrb, h->lock);                                      \
       /* relocate */                                                    \
       for (i=0 ; i<old_n_buckets ; i++) {                               \
         if (!__ac_iseither(old_ed_flags, i)) {                          \
+          RWLOCK_UNLOCK_IF_LOCKED(mrb, h->lock);                        \
           khint_t k = kh_put_##name(mrb, h, old_keys[i]);               \
+          RWLOCK_WRLOCK(mrb, h->lock);                                  \
           if (kh_is_map) kh_value(h,k) = old_vals[i];                   \
         }                                                               \
       }                                                                 \
+      RWLOCK_UNLOCK_IF_LOCKED(mrb, h->lock);                            \
       mrb_free(mrb, old_keys);                                          \
     }                                                                   \
-    RWLOCK_UNLOCK_IF_LOCKED(mrb, h->lock);                              \
   }                                                                     \
   khint_t kh_put_##name(mrb_state *mrb, kh_##name##_t *h, khkey_t key)  \
   {                                                                     \
     khint_t k;                                                          \
     RWLOCK_WRLOCK_AND_DEFINE(mrb, h->lock);                             \
     if (h->n_occupied >= h->upper_bound) {                              \
+      RWLOCK_UNLOCK_IF_LOCKED(mrb, h->lock);                            \
       kh_resize_##name(mrb, h, h->n_buckets*2);                         \
+      RWLOCK_WRLOCK(mrb, h->lock);                                      \
     }                                                                   \
     k = __hash_func(mrb,key) & (h->mask);                               \
     while (!__ac_iseither(h->ed_flags, k)) {                            \

@@ -17,7 +17,10 @@ typedef void    *mrb_gem_rwlock_t;
 typedef struct mrb_thread_t {
   struct mrb_state   *mrb;
   mrb_gem_thread_t    thread;
+  mrb_value           retval;
 } mrb_thread_t;
+
+#define MRB_THREAD_INITIALIZER ((mrb_thread_t){ NULL, NULL, mrb_nil_value() })
 
 /**
  * Type of thread table
@@ -182,7 +185,7 @@ extern void     mrb_vm_lock_destroy(struct mrb_state *mrb);
 #ifdef ENABLE_THREAD
 extern struct mrb_state *mrb_vm_get_thread_state(mrb_thread_t *thread);
 extern mrb_bool   mrb_vm_attach_thread(struct mrb_state *mrb, mrb_thread_t *thread);
-extern void       mrb_vm_detach_thread(struct mrb_state *mrb, mrb_thread_t *thread);
+extern mrb_value  mrb_vm_detach_thread(struct mrb_state *mrb, mrb_thread_t *thread);
 extern void       mrb_vm_thread_api_set(struct mrb_state *mrb, mrb_thread_api const *api);
 extern void       mrb_vm_lock_api_set(struct mrb_state *mrb, mrb_thread_lock_api const *api);
 #endif
