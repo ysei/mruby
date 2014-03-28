@@ -723,9 +723,9 @@ root_scan_phase(mrb_state *mrb)
     mrb->gc_context->atomic_gray_list = NULL;
   }
 
+#ifndef ENABLE_THREAD
   mrb_gc_mark_gv(mrb);
 
-#ifndef ENABLE_THREAD
   /* mark arena */
   for (i=0,e=mrb->arena_idx; i<e; i++) {
     mrb_gc_mark(mrb, mrb->arena[i]);
@@ -733,19 +733,25 @@ root_scan_phase(mrb_state *mrb)
 #else
   RWLOCK_RDLOCK_AND_DEFINE(mrb, mrb->lock_thread);
   if (mrb->thread_table) {
-    size_t const n = mrb->thread_table->count;
+    size_t const n = mrb->thread_table->capacity;
     for (i = 0; i < n; ++i) {
       mrb_thread_t *entry = &mrb->thread_table->threads[i];
       if (entry->mrb == NULL) {
         continue;
       }
+
+      mrb_gc_mark_gv(entry->mrb);
+
       /* mark arena */
       size_t j;
-      for (j = 0, e = mrb->arena_idx; j < e; ++j) {
+      for (j = 0, e = entry->mrb->arena_idx; j < e; ++j) {
         mrb_gc_mark(entry->mrb, entry->mrb->arena[j]);
       }
     }
   } else {
+    mrb_gc_mark_gv(mrb);
+
+    /* mark arena */
     for (i = 0, e = mrb->arena_idx; i < e; i++) {
       mrb_gc_mark(mrb, mrb->arena[i]);
     }
@@ -771,7 +777,7 @@ root_scan_phase(mrb_state *mrb)
 #else
   RWLOCK_RDLOCK(mrb, mrb->lock_thread);
   if (mrb->thread_table) {
-    size_t const n = mrb->thread_table->count;
+    size_t const n = mrb->thread_table->capacity;
     for (i = 0; i < n; ++i) {
       mrb_thread_t *entry = &mrb->thread_table->threads[i];
       if (entry->mrb == NULL) {
@@ -780,7 +786,7 @@ root_scan_phase(mrb_state *mrb)
       /* mark stack */
       mark_context(entry->mrb, entry->mrb->root_c);
       if (entry->mrb->root_c->fib) {
-        mrb_gc_mark(mrb, (struct RBasic*)entry->mrb->root_c->fib);
+        mrb_gc_mark(entry->mrb, (struct RBasic*)entry->mrb->root_c->fib);
       }
       if (entry->mrb->root_c != entry->mrb->c) {
         mark_context(entry->mrb, entry->mrb->c);
