@@ -37,7 +37,7 @@ KHASH_DEFINE (n2s, symbol_name, mrb_sym, 1, sym_hash_func, sym_hash_equal)
 static mrb_sym
 sym_intern(mrb_state *mrb, const char *name, size_t len, mrb_bool lit)
 {
-  MRB_VM_SYMTBL_RDLOCK_AND_DEFINE(mrb);
+  MRB_VM_SYMTBL_LOCK_AND_DEFINE(mrb);
 
   khash_t(n2s) *h = mrb->name2sym;
   symbol_name sname;
@@ -60,7 +60,7 @@ sym_intern(mrb_state *mrb, const char *name, size_t len, mrb_bool lit)
   }
 
   MRB_VM_SYMTBL_UNLOCK_IF_LOCKED(mrb);
-  MRB_VM_SYMTBL_WRLOCK(mrb);
+  MRB_VM_SYMTBL_LOCK(mrb);
 
   sym = ++mrb->symidx;
   if (lit) {
@@ -107,7 +107,7 @@ mrb_intern_str(mrb_state *mrb, mrb_value str)
 mrb_value
 mrb_check_intern(mrb_state *mrb, const char *name, size_t len)
 {
-  MRB_VM_SYMTBL_RDLOCK_AND_DEFINE(mrb);
+  MRB_VM_SYMTBL_LOCK_AND_DEFINE(mrb);
 
   khash_t(n2s) *h = mrb->name2sym;
   symbol_name sname = { 0 };
@@ -145,7 +145,7 @@ mrb_check_intern_str(mrb_state *mrb, mrb_value str)
 const char*
 mrb_sym2name_len(mrb_state *mrb, mrb_sym sym, mrb_int *lenp)
 {
-  MRB_VM_SYMTBL_RDLOCK_AND_DEFINE(mrb);
+  MRB_VM_SYMTBL_LOCK_AND_DEFINE(mrb);
 
   khash_t(n2s) *h = mrb->name2sym;
   khiter_t k;
@@ -169,7 +169,7 @@ mrb_sym2name_len(mrb_state *mrb, mrb_sym sym, mrb_int *lenp)
 void
 mrb_free_symtbl(mrb_state *mrb)
 {
-  MRB_VM_SYMTBL_WRLOCK_AND_DEFINE(mrb);
+  MRB_VM_SYMTBL_LOCK_AND_DEFINE(mrb);
 
   khash_t(n2s) *h = mrb->name2sym;
   khiter_t k;
@@ -190,7 +190,7 @@ mrb_free_symtbl(mrb_state *mrb)
 void
 mrb_init_symtbl(mrb_state *mrb)
 {
-  MRB_VM_SYMTBL_WRLOCK_AND_DEFINE(mrb);
+  MRB_VM_SYMTBL_LOCK_AND_DEFINE(mrb);
 
   mrb->name2sym = kh_init(n2s, mrb);
 

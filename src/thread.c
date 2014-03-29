@@ -10,7 +10,7 @@
 #endif
 
 void
-mrb_default_deadlock_handler(mrb_state *mrb, mrb_rwlock_t *lock)
+mrb_default_deadlock_handler(mrb_state *mrb, mrb_lock_t *lock)
 {
 #ifdef ENABLE_STDIO
   fprintf(
@@ -21,73 +21,53 @@ mrb_default_deadlock_handler(mrb_state *mrb, mrb_rwlock_t *lock)
 }
 
 int
-mrb_rwlock_init(mrb_state *mrb, mrb_rwlock_t *lock)
+mrb_lock_init(mrb_state *mrb, mrb_lock_t *lock)
 {
-  if (mrb->thread_lock_api.rwlock_init) {
-    return mrb->thread_lock_api.rwlock_init(mrb, lock);
+  if (mrb->thread_lock_api.lock_init) {
+    return mrb->thread_lock_api.lock_init(mrb, lock);
   }
-  return RWLOCK_STATUS_NOT_SUPPORTED;
+  return MRB_LOCK_STATUS_NOT_SUPPORTED;
 }
 
 int
-mrb_rwlock_destroy(mrb_state *mrb, mrb_rwlock_t *lock)
+mrb_lock_destroy(mrb_state *mrb, mrb_lock_t *lock)
 {
-  if (mrb->thread_lock_api.rwlock_destroy) {
-    return mrb->thread_lock_api.rwlock_destroy(mrb, lock);
+  if (mrb->thread_lock_api.lock_destroy) {
+    return mrb->thread_lock_api.lock_destroy(mrb, lock);
   }
-  return RWLOCK_STATUS_NOT_SUPPORTED;
+  return MRB_LOCK_STATUS_NOT_SUPPORTED;
 }
 
 int
-mrb_rwlock_wrlock(mrb_state *mrb, mrb_rwlock_t *lock)
+mrb_lock_lock(mrb_state *mrb, mrb_lock_t *lock)
 {
-  if (mrb->thread_lock_api.rwlock_wrlock) {
+  if (mrb->thread_lock_api.lock_lock) {
     if (!lock) {
-      return RWLOCK_STATUS_INVALID_ARGUMENTS;
+      return MRB_LOCK_STATUS_INVALID_ARGUMENTS;
     }
-    int const status = mrb->thread_lock_api.rwlock_wrlock(mrb, lock, RWLOCK_DEADLOCK_DETECTION_TIMEOUT);
-    if (status == RWLOCK_STATUS_TIMEOUT) {
-      if (mrb->thread_lock_api.rwlock_deadlock_handler) {
-        mrb->thread_lock_api.rwlock_deadlock_handler(mrb, lock);
+    int const status = mrb->thread_lock_api.lock_lock(mrb, lock, MRB_LOCK_DEADLOCK_DETECTION_TIMEOUT);
+    if (status == MRB_LOCK_STATUS_TIMEOUT) {
+      if (mrb->thread_lock_api.lock_deadlock_handler) {
+        mrb->thread_lock_api.lock_deadlock_handler(mrb, lock);
       } else {
         mrb_default_deadlock_handler(mrb, lock);
       }
     }
     return status;
   }
-  return RWLOCK_STATUS_NOT_SUPPORTED;
+  return MRB_LOCK_STATUS_NOT_SUPPORTED;
 }
 
 int
-mrb_rwlock_rdlock(mrb_state *mrb, mrb_rwlock_t *lock)
+mrb_lock_unlock(mrb_state *mrb, mrb_lock_t *lock)
 {
-  if (mrb->thread_lock_api.rwlock_rdlock) {
+  if (mrb->thread_lock_api.lock_unlock) {
     if (!lock) {
-      return RWLOCK_STATUS_INVALID_ARGUMENTS;
+      return MRB_LOCK_STATUS_INVALID_ARGUMENTS;
     }
-    int const status = mrb->thread_lock_api.rwlock_rdlock(mrb, lock, RWLOCK_DEADLOCK_DETECTION_TIMEOUT);
-    if (status == RWLOCK_STATUS_TIMEOUT) {
-      if (mrb->thread_lock_api.rwlock_deadlock_handler) {
-        mrb->thread_lock_api.rwlock_deadlock_handler(mrb, lock);
-      } else {
-        mrb_default_deadlock_handler(mrb, lock);
-      }
-    }
-    return status;
+    return mrb->thread_lock_api.lock_unlock(mrb, lock);
   }
-  return RWLOCK_STATUS_NOT_SUPPORTED;
-}
-
-int
-mrb_rwlock_unlock(mrb_state *mrb, mrb_rwlock_t *lock)
-{
-  if (mrb->thread_lock_api.rwlock_unlock) {
-    if (!lock) {
-      return RWLOCK_STATUS_INVALID_ARGUMENTS;
-    }
-    return mrb->thread_lock_api.rwlock_unlock(mrb, lock);
-  }
-  return RWLOCK_STATUS_NOT_SUPPORTED;
+  return MRB_LOCK_STATUS_NOT_SUPPORTED;
 }
 
 mrb_gem_thread_t
@@ -96,7 +76,7 @@ mrb_thread_get_self_invoke(mrb_state *mrb)
   if (mrb->thread_api.thread_get_self) {
     return mrb->thread_api.thread_get_self(mrb);
   }
-  return NULL;
+  return MRB_GEM_THREAD_INVALID;
 }
 
 int
@@ -126,70 +106,17 @@ mrb_thread_free_invoke(mrb_state *mrb, mrb_gem_thread_t t)
 }
 
 
-extern void mrb_init_symtbl(mrb_state*);
-extern void mrb_init_class(mrb_state*);
-extern void mrb_init_object(mrb_state*);
-extern void mrb_init_kernel(mrb_state*);
-extern void mrb_init_comparable(mrb_state*);
-extern void mrb_init_enumerable(mrb_state*);
-extern void mrb_init_symbol(mrb_state*);
-extern void mrb_init_exception(mrb_state*);
-extern void mrb_init_proc(mrb_state*);
-extern void mrb_init_string(mrb_state*);
-extern void mrb_init_array(mrb_state*);
-extern void mrb_init_hash(mrb_state*);
-extern void mrb_init_heap(mrb_state*);
-extern void mrb_init_numeric(mrb_state*);
-extern void mrb_init_range(mrb_state*);
-extern void mrb_init_gc(mrb_state*);
-extern void mrb_init_math(mrb_state*);
-extern void mrb_init_mrblib(mrb_state*);
-extern void mrb_init_mrbgems(mrb_state*);
-extern void mrb_final_core(mrb_state*);
-extern void mrb_final_mrbgems(mrb_state*);
-extern void mrb_free_heap(mrb_state *mrb);
-
-#define DONE mrb_gc_arena_restore(mrb, 0);
 static void
 mrb_init_core_for_thread(mrb_state *mrb)
 {
-//  mrb_init_class(mrb); DONE;
-//  mrb_init_object(mrb); DONE;
-//  mrb_init_kernel(mrb); DONE;
-//  mrb_init_comparable(mrb); DONE;
-//  mrb_init_enumerable(mrb); DONE;
-
-//  mrb_init_symbol(mrb); DONE;
-//  mrb_init_exception(mrb); DONE;
-//  mrb_init_proc(mrb); DONE;
-//  mrb_init_string(mrb); DONE;
-//  mrb_init_array(mrb); DONE;
-//  mrb_init_hash(mrb); DONE;
-//  mrb_init_numeric(mrb); DONE;
-//  mrb_init_range(mrb); DONE;
-//  mrb_init_gc(mrb); DONE;
-//  mrb_init_mrblib(mrb); DONE;
-#ifndef DISABLE_GEMS
-//  mrb_init_mrbgems(mrb); DONE;
-#endif
 }
 
 void
 mrb_final_core_for_thread(mrb_state *mrb)
 {
-#ifndef DISABLE_GEMS
-  mrb_final_mrbgems(mrb); DONE;
-#endif
 }
 
 extern void mrb_init_core(mrb_state*);
-
-#define DEFAULT_GC_INTERVAL_RATIO 200
-#define DEFAULT_GC_STEP_RATIO 200
-#define DEFAULT_MAJOR_GC_INC_RATIO 200
-#define is_generational(mrb) ((mrb)->is_generational_gc_mode)
-#define is_major_gc(mrb) (is_generational(mrb) && (mrb)->gc_full)
-#define is_minor_gc(mrb) (is_generational(mrb) && !(mrb)->gc_full)
 
 static mrb_state*
 mrb_vm_thread_open(mrb_state *mrb)
@@ -201,7 +128,7 @@ mrb_vm_thread_open(mrb_state *mrb)
   mrb_assert(sizeof(void*) == 4);
 #endif
 
-  thread_mrb = (mrb_state *)mrb_malloc(mrb, sizeof(mrb_state));
+  thread_mrb = (mrb_state *)mrb_malloc_without_gc_lock(mrb, sizeof(mrb_state));
   if (thread_mrb == NULL) return NULL;
 
   *thread_mrb = *mrb;
@@ -209,12 +136,12 @@ mrb_vm_thread_open(mrb_state *mrb)
   thread_mrb->jmp = NULL;
 
 #ifndef MRB_GC_FIXED_ARENA
-  thread_mrb->arena = (struct RBasic**)mrb_malloc(mrb, sizeof(struct RBasic*)*MRB_GC_ARENA_SIZE);
+  thread_mrb->arena = (struct RBasic**)mrb_malloc_without_gc_lock(mrb, sizeof(struct RBasic*)*MRB_GC_ARENA_SIZE);
   thread_mrb->arena_capa = MRB_GC_ARENA_SIZE;
 #endif
   thread_mrb->arena_idx = 0;
 
-  thread_mrb->c = (struct mrb_context*)mrb_malloc(mrb, sizeof(struct mrb_context));
+  thread_mrb->c = (struct mrb_context*)mrb_malloc_without_gc_lock(mrb, sizeof(struct mrb_context));
   *thread_mrb->c = mrb_context_zero;
   thread_mrb->root_c = thread_mrb->c;
 
@@ -274,18 +201,7 @@ mrb_vm_attach_thread(mrb_state *mrb, mrb_thread_t *thread)
     return FALSE;
   }
 
-  MRB_VM_GC_WRLOCK_AND_DEFINE(mrb);
-
-  if (!mrb->thread_table) {
-    mrb->thread_table = (mrb_thread_table_t*)mrb_malloc(mrb, sizeof(mrb_thread_table_t));
-    if (NULL == mrb->thread_table) {
-      MRB_VM_GC_UNLOCK_IF_LOCKED(mrb);
-      return FALSE;
-    }
-    mrb->thread_table->capacity = 0;
-    mrb->thread_table->count    = 0;
-    mrb->thread_table->threads  = NULL;
-  }
+  MRB_VM_GC_LOCK_AND_DEFINE(mrb);
 
   mrb_thread_t *entry = NULL;
 
@@ -294,7 +210,7 @@ mrb_vm_attach_thread(mrb_state *mrb, mrb_thread_t *thread)
   for (i = 1; i < capacity; ++i) {
     if (mrb->thread_table->threads[i].mrb != NULL) {
       mrb_thread_t *t = &mrb->thread_table->threads[i];
-      if (THREAD_EQUALS(mrb, THREAD_GET_SELF(mrb), t->thread)) {
+      if (MRB_THREAD_EQUALS(mrb, MRB_THREAD_GET_SELF(mrb), t->thread)) {
         *thread = mrb->thread_table->threads[i];
         MRB_VM_GC_UNLOCK_IF_LOCKED(mrb);
         return TRUE;
@@ -315,7 +231,7 @@ mrb_vm_attach_thread(mrb_state *mrb, mrb_thread_t *thread)
   }
 
   entry->mrb = mrb_vm_thread_open(mrb);
-  entry->thread = THREAD_GET_SELF(entry->mrb);
+  entry->thread = MRB_THREAD_GET_SELF(entry->mrb);
 
   if (entry->mrb == NULL) {
     MRB_VM_GC_UNLOCK_IF_LOCKED(mrb);
@@ -340,7 +256,7 @@ mrb_vm_detach_thread(mrb_state *mrb, mrb_thread_t *thread)
     return mrb_nil_value();
   }
 
-  MRB_VM_GC_WRLOCK_AND_DEFINE(mrb);
+  MRB_VM_GC_LOCK_AND_DEFINE(mrb);
 
   if (!mrb->thread_table) {
     MRB_VM_GC_UNLOCK_IF_LOCKED(mrb);
@@ -365,14 +281,14 @@ mrb_vm_detach_thread(mrb_state *mrb, mrb_thread_t *thread)
     entry = mrb->thread_table->threads[i];
     mrb_gc_protect(mrb, entry.retval);
     mrb->thread_table->threads[i].mrb = NULL;
-    mrb->thread_table->threads[i].thread = NULL;
+    mrb->thread_table->threads[i].thread = MRB_GEM_THREAD_INITIALIZER;
     mrb->thread_table->threads[i].retval = mrb_nil_value();
     mrb->thread_table->count -= 1;
     break;
   }
 
   if (entry.mrb != NULL) {
-    THREAD_FREE(entry.mrb, entry.thread);
+    MRB_THREAD_FREE(entry.mrb, entry.thread);
     mrb_vm_thread_close(entry.mrb);
   }
 
@@ -396,21 +312,21 @@ mrb_vm_lock_api_set(mrb_state *mrb, mrb_thread_lock_api const *api)
 mrb_bool
 mrb_vm_lock_init(mrb_state *mrb)
 {
-  mrb->lock_heap   = MRB_RWLOCK_INVALID;
-  mrb->lock_symtbl = MRB_RWLOCK_INVALID;
-  mrb->lock_thread = MRB_RWLOCK_INVALID;
-  mrb->lock_gc     = MRB_RWLOCK_INVALID;
+  mrb->lock_heap   = (mrb_lock_t*)mrb_malloc(mrb, sizeof(mrb_lock_t));
+  mrb->lock_symtbl = (mrb_lock_t*)mrb_malloc(mrb, sizeof(mrb_lock_t));
+  mrb->lock_thread = (mrb_lock_t*)mrb_malloc(mrb, sizeof(mrb_lock_t));
+  mrb->lock_gc     = (mrb_lock_t*)mrb_malloc(mrb, sizeof(mrb_lock_t));
 
-  if (RWLOCK_INIT(mrb, mrb->lock_heap) != RWLOCK_STATUS_OK) {
+  if (MRB_LOCK_INIT(mrb, mrb->lock_heap) != MRB_LOCK_STATUS_OK) {
     return FALSE;
   }
-  if (RWLOCK_INIT(mrb, mrb->lock_symtbl) != RWLOCK_STATUS_OK) {
+  if (MRB_LOCK_INIT(mrb, mrb->lock_symtbl) != MRB_LOCK_STATUS_OK) {
     return FALSE;
   }
-  if (RWLOCK_INIT(mrb, mrb->lock_thread) != RWLOCK_STATUS_OK) {
+  if (MRB_LOCK_INIT(mrb, mrb->lock_thread) != MRB_LOCK_STATUS_OK) {
     return FALSE;
   }
-  if (RWLOCK_INIT(mrb, mrb->lock_gc) != RWLOCK_STATUS_OK) {
+  if (MRB_LOCK_INIT(mrb, mrb->lock_gc) != MRB_LOCK_STATUS_OK) {
     return FALSE;
   }
   return TRUE;
@@ -419,10 +335,14 @@ mrb_vm_lock_init(mrb_state *mrb)
 void
 mrb_vm_lock_destroy(mrb_state *mrb)
 {
-  RWLOCK_DESTROY(mrb, mrb->lock_symtbl);
-  RWLOCK_DESTROY(mrb, mrb->lock_heap);
-  RWLOCK_DESTROY(mrb, mrb->lock_thread);
-  RWLOCK_DESTROY(mrb, mrb->lock_gc);
+  MRB_LOCK_DESTROY(mrb, mrb->lock_symtbl);
+  MRB_LOCK_DESTROY(mrb, mrb->lock_heap);
+  MRB_LOCK_DESTROY(mrb, mrb->lock_thread);
+  MRB_LOCK_DESTROY(mrb, mrb->lock_gc);
+  mrb_free(mrb, mrb->lock_symtbl);
+  mrb_free(mrb, mrb->lock_heap);
+  mrb_free(mrb, mrb->lock_thread);
+  mrb_free(mrb, mrb->lock_gc);
 }
 
 #endif

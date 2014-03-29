@@ -1346,7 +1346,6 @@ RETRY_TRY_BLOCK:
       /* fall through */
     CASE(OP_RETURN) {
       /* A      return R(A) */
-//      MRB_VM_GC_WRLOCK_AND_DEFINE(mrb);
       if (mrb->exc) {
         mrb_callinfo *ci;
         int eidx;
@@ -1369,7 +1368,6 @@ RETRY_TRY_BLOCK:
           mrb->c->stack = ci[1].stackent;
           if (ci[1].acc == CI_ACC_SKIP && prev_jmp) {
             mrb->jmp = prev_jmp;
-//            MRB_VM_GC_UNLOCK_IF_LOCKED(mrb);
             MRB_THROW(prev_jmp);
           }
           if (ci > mrb->c->cibase) {
@@ -1467,10 +1465,11 @@ RETRY_TRY_BLOCK:
         cipop(mrb);
         acc = ci->acc;
         pc = ci->pc;
+        MRB_VM_GC_LOCK_AND_DEFINE(mrb);
         regs = mrb->c->stack = ci->stackent;
         if (acc == CI_ACC_SKIP) {
           mrb->jmp = prev_jmp;
-#if 0
+#ifdef ENABLE_THREAD
           if (mrb->thread_table) {
             size_t const n = mrb->thread_table->capacity;
             size_t i;
@@ -1482,7 +1481,7 @@ RETRY_TRY_BLOCK:
             }
           }
 #endif
-//          MRB_VM_GC_UNLOCK_IF_LOCKED(mrb);
+          MRB_VM_GC_UNLOCK_IF_LOCKED(mrb);
           return v;
         }
         DEBUG(printf("from :%s\n", mrb_sym2name(mrb, ci->mid)));
@@ -1492,8 +1491,8 @@ RETRY_TRY_BLOCK:
         syms = irep->syms;
 
         regs[acc] = v;
+        MRB_VM_GC_UNLOCK_IF_LOCKED(mrb);
       }
-//      MRB_VM_GC_UNLOCK_IF_LOCKED(mrb);
       JUMP;
     }
 

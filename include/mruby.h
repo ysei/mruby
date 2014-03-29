@@ -282,6 +282,11 @@ void *mrb_realloc_simple(mrb_state*, void*, size_t); /* return NULL if no memory
 void *mrb_malloc_simple(mrb_state*, size_t);  /* return NULL if no memory available */
 struct RBasic *mrb_obj_alloc(mrb_state*, enum mrb_vtype, struct RClass*);
 void mrb_free(mrb_state*, void*);
+#ifdef ENABLE_THREAD
+void *mrb_malloc_without_gc_lock(mrb_state*, size_t);
+void *mrb_realloc_without_gc_lock(mrb_state*, void*, size_t);
+void *mrb_realloc_simple_without_gc_lock(mrb_state*, void*, size_t);
+#endif
 
 mrb_value mrb_str_new(mrb_state *mrb, const char *p, size_t len);
 mrb_value mrb_str_new_cstr(mrb_state*, const char*);
