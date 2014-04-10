@@ -306,6 +306,17 @@ mrb_define_class_under(mrb_state *mrb, struct RClass *outer, const char *name, s
   return c;
 }
 
+#ifdef ENABLE_METHOD_CACHE
+#define MRB_METHOD_CACHE_INDEX_MASK (MRB_METHOD_CACHE_SIZE - 1)
+
+static inline uint_fast16_t
+compute_method_cache_table_index(mrb_sym m)
+{
+  uint_fast16_t const u_m = (uint_fast16_t)(((m & 0x00fc0u) >>  6) ^ (m & 0x03fu));
+  return (uint_fast16_t)(u_m & MRB_METHOD_CACHE_INDEX_MASK);
+}
+#endif
+
 void
 mrb_define_method_raw(mrb_state *mrb, struct RClass *c, mrb_sym mid, struct RProc *p)
 {
@@ -318,6 +329,9 @@ mrb_define_method_raw(mrb_state *mrb, struct RClass *c, mrb_sym mid, struct RPro
   if (p) {
     mrb_field_write_barrier(mrb, (struct RBasic *)c, (struct RBasic *)p);
   }
+#ifdef ENABLE_METHOD_CACHE
+  mrb->method_cache[compute_method_cache_table_index(mid)].dirty = TRUE;
+#endif
 }
 
 void
@@ -341,17 +355,7 @@ mrb_define_method(mrb_state *mrb, struct RClass *c, const char *name, mrb_func_t
 void
 mrb_define_method_vm(mrb_state *mrb, struct RClass *c, mrb_sym name, mrb_value body)
 {
-  khash_t(mt) *h = c->mt;
-  khiter_t k;
-  struct RProc *p;
-
-  if (!h) h = c->mt = kh_init(mt, mrb);
-  k = kh_put(mt, mrb, h, name);
-  p = mrb_proc_ptr(body);
-  kh_value(h, k) = p;
-  if (p) {
-    mrb_field_write_barrier(mrb, (struct RBasic *)c, (struct RBasic *)p);
-  }
+  mrb_define_method_raw(mrb, c, name, mrb_proc_ptr(body));
 }
 
 static mrb_value
@@ -1016,6 +1020,14 @@ mrb_method_search_vm(mrb_state *mrb, struct RClass **cp, mrb_sym mid)
   struct RProc *m;
   struct RClass *c = *cp;
 
+#ifdef ENABLE_METHOD_CACHE
+  mrb_method_cache_entry *const entry = &mrb->method_cache[compute_method_cache_table_index(mid)];
+  if ((entry->mid == mid) && (entry->target_class == c) && !entry->dirty && entry->proc && !is_dead(mrb, entry->proc)) {
+    *cp = c;
+    return entry->proc;
+  }
+#endif
+
   while (c) {
     khash_t(mt) *h = c->mt;
 
@@ -1024,6 +1036,9 @@ mrb_method_search_vm(mrb_state *mrb, struct RClass **cp, mrb_sym mid)
       if (k != kh_end(h)) {
         m = kh_value(h, k);
         if (!m) break;
+#ifdef ENABLE_METHOD_CACHE
+        *entry = (mrb_method_cache_entry){ mid, FALSE, *cp, m };
+#endif
         *cp = c;
         return m;
       }
@@ -1770,6 +1785,9 @@ remove_method(mrb_state *mrb, mrb_value mod, mrb_sym mid)
     k = kh_get(mt, mrb, h, mid);
     if (k != kh_end(h)) {
       kh_del(mt, mrb, h, k);
+#ifdef ENABLE_METHOD_CACHE
+      mrb->method_cache[compute_method_cache_table_index(mid)].dirty = TRUE;
+#endif
       return;
     }
   }

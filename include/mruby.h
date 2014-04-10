@@ -100,6 +100,20 @@ enum gc_state {
   GC_STATE_SWEEP
 };
 
+#ifdef ENABLE_METHOD_CACHE
+#ifndef MRB_METHOD_CACHE_SIZE
+/* 'MRB_METHOD_CACHE_SIZE' must be set the value which is expressed by expression "2^n". */
+#define MRB_METHOD_CACHE_SIZE 64u
+#endif
+
+typedef struct mrb_method_cache_entry {
+  mrb_sym        mid;
+  mrb_bool       dirty;
+  struct RClass *target_class;
+  struct RProc  *proc;
+} mrb_method_cache_entry;
+#endif
+
 struct mrb_jmpbuf;
 
 typedef struct mrb_state {
@@ -159,6 +173,10 @@ typedef struct mrb_state {
 
   mrb_sym symidx;
   struct kh_n2s *name2sym;      /* symbol table */
+
+#ifdef ENABLE_METHOD_CACHE
+  mrb_method_cache_entry method_cache[MRB_METHOD_CACHE_SIZE];
+#endif
 
 #ifdef ENABLE_DEBUG
   void (*code_fetch_hook)(struct mrb_state* mrb, struct mrb_irep *irep, mrb_code *pc, mrb_value *regs);
