@@ -31,8 +31,8 @@ sym_hash_func(mrb_state *mrb, const symbol_name s)
 }
 #define sym_hash_equal(mrb,a, b) (a.len == b.len && memcmp(a.name, b.name, a.len) == 0)
 
-KHASH_DECLARE(n2s, symbol_name, mrb_sym, 1)
-KHASH_DEFINE (n2s, symbol_name, mrb_sym, 1, sym_hash_func, sym_hash_equal)
+KHASH_DECLARE(n2s, symbol_name, mrb_sym, TRUE)
+KHASH_DEFINE (n2s, symbol_name, mrb_sym, TRUE, sym_hash_func, sym_hash_equal)
 /* ------------------------------------------------------ */
 static mrb_sym
 sym_intern(mrb_state *mrb, const char *name, size_t len, mrb_bool lit)
@@ -429,7 +429,8 @@ sym_inspect(mrb_state *mrb, mrb_value sym)
   memcpy(RSTRING_PTR(str)+1, name, len);
   if (!symname_p(name) || strlen(name) != len) {
     str = mrb_str_dump(mrb, str);
-    memcpy(RSTRING_PTR(str), ":\"", 2);
+    RSTRING_PTR(str)[0] = ':';
+    RSTRING_PTR(str)[1] = '"';
   }
   return str;
 }

@@ -2,7 +2,7 @@ MRuby::Build.new do |conf|
   # load specific toolchain settings
 
   # Gets set by the VS command prompts.
-  if ENV['VisualStudioVersion']
+  if ENV['VisualStudioVersion'] || ENV['VSINSTALLDIR']
     toolchain :visualcpp
   else
     toolchain :gcc
@@ -80,7 +80,7 @@ MRuby::Build.new do |conf|
   # conf.file_separator = '/'
 
   # bintest
-  # conf.enable_bintest = true
+  # conf.enable_bintest
 end
 
 # Define cross build settings

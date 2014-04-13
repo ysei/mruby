@@ -16,7 +16,7 @@
 #include "mruby/error.h"
 #include "mruby/data.h"
 
-KHASH_DEFINE(mt, mrb_sym, struct RProc*, 1, kh_int_hash_func, kh_int_hash_equal)
+KHASH_DEFINE(mt, mrb_sym, struct RProc*, TRUE, kh_int_hash_func, kh_int_hash_equal)
 
 void
 mrb_gc_mark_mt(mrb_state *mrb, struct RClass *c)
@@ -982,6 +982,10 @@ mrb_singleton_class(mrb_state *mrb, mrb_value v)
   }
   obj = mrb_basic_ptr(v);
   prepare_singleton_class(mrb, obj);
+  if (mrb->c && mrb->c->ci && mrb->c->ci->target_class) {
+    mrb_obj_iv_set(mrb, (struct RObject*)obj->c, mrb_intern_lit(mrb, "__outer__"),
+                   mrb_obj_value(mrb->c->ci->target_class));
+  }
   return mrb_obj_value(obj->c);
 }
 
@@ -1088,7 +1092,7 @@ mrb_instance_new(mrb_state *mrb, mrb_value cv)
 }
 
 mrb_value
-mrb_obj_new(mrb_state *mrb, struct RClass *c, int argc, mrb_value *argv)
+mrb_obj_new(mrb_state *mrb, struct RClass *c, int argc, const mrb_value *argv)
 {
   mrb_value obj;
 

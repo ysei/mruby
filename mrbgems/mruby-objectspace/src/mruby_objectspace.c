@@ -15,12 +15,13 @@ os_count_object_type(mrb_state *mrb, struct RBasic *obj, void *data)
   struct os_count_struct *obj_count;
   obj_count = (struct os_count_struct*)data;
 
+  obj_count->total++;
+
   if (is_dead(mrb, obj)) {
     obj_count->freed++;
   }
   else {
     obj_count->counts[obj->tt]++;
-    obj_count->total++;
   }
 }
 
@@ -34,8 +35,8 @@ os_count_object_type(mrb_state *mrb, struct RBasic *obj, void *data)
  *  {
  *    :TOTAL=>10000,
  *    :FREE=>3011,
- *    :MRB_TT_OBJECT=>6,
- *    :MRB_TT_CLASS=>404,
+ *    :T_OBJECT=>6,
+ *    :T_CLASS=>404,
  *    # ...
  *  }
  *
@@ -90,6 +91,7 @@ os_count_objects(mrb_state *mrb, mrb_value self)
       COUNT_TYPE(T_FILE);
       COUNT_TYPE(T_ENV);
       COUNT_TYPE(T_DATA);
+      COUNT_TYPE(T_FIBER);
 #undef COUNT_TYPE
     default:
       type = mrb_fixnum_value(i); break;

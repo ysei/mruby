@@ -193,7 +193,7 @@ If you want a temporary files use `tempfile` module of CRuby instead of ```/tmp/
 
 You can enable it with following:
 
-	conf.enable_bintest = true
+	conf.enable_bintest
 
 ### C++ ABI
 
@@ -204,6 +204,16 @@ Whenever you mix C++ code C++ ABI mode would be enabled automatically.
 If you need to enable C++ ABI mode explicity add the following:
 
 	conf.enable_cxx_abi
+
+#### C++ exception disabling.
+
+If you need to force C++ exception disable
+(For example using a compiler option to disable C++ exception)
+add following:
+
+	conf.disable_cxx_exception
+
+Note that it must be called before ```enable_cxx_abi``` or ```gem``` method.
 
 ### Debugging mode
 

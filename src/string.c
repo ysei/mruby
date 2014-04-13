@@ -650,7 +650,7 @@ str_eql(mrb_state *mrb, const mrb_value str1, const mrb_value str2)
 mrb_bool
 mrb_str_equal(mrb_state *mrb, mrb_value str1, mrb_value str2)
 {
-  if (mrb_obj_equal(mrb, str1, str2)) return TRUE;
+  if (mrb_immediate_p(str2)) return FALSE;
   if (!mrb_string_p(str2)) {
     if (mrb_nil_p(str2)) return FALSE;
     if (!mrb_respond_to(mrb, str2, mrb_intern_lit(mrb, "to_str"))) {
@@ -754,7 +754,7 @@ mrb_memsearch(const void *x0, mrb_int m, const void *y0, mrb_int n)
   else if (m < 1) {
     return 0;
   }
- else if (m == 1) {
+  else if (m == 1) {
     const unsigned char *ys = y, *ye = ys + n;
     for (; y < ye; ++y) {
       if (*x == *y)
@@ -796,10 +796,11 @@ mrb_str_index(mrb_state *mrb, mrb_value str, mrb_value sub, mrb_int offset)
 mrb_value
 mrb_str_dup(mrb_state *mrb, mrb_value str)
 {
-  /* should return shared string */
   struct RString *s = mrb_str_ptr(str);
+  struct RString *dup = str_new(mrb, 0, 0);
 
-  return mrb_str_new(mrb, STR_PTR(s), STR_LEN(s));
+  str_with_class(mrb, dup, str);
+  return str_replace(mrb, dup, s);
 }
 
 static mrb_value
