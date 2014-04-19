@@ -26,7 +26,7 @@ typedef enum {
   NOEX_RESPONDS  = 0x80
 } mrb_method_flag_t;
 
-mrb_bool
+static mrb_bool
 mrb_obj_basic_to_s_p(mrb_state *mrb, mrb_value obj)
 {
   struct RProc *me = mrb_method_search(mrb, mrb_class(mrb, obj), mrb_intern_lit(mrb, "to_s"));
@@ -248,7 +248,7 @@ mrb_obj_class_m(mrb_state *mrb, mrb_value self)
   return mrb_obj_value(mrb_obj_class(mrb, self));
 }
 
-struct RClass*
+static struct RClass*
 mrb_singleton_class_clone(mrb_state *mrb, mrb_value obj)
 {
   struct RClass *klass = mrb_basic_ptr(obj)->c;
@@ -434,7 +434,7 @@ mrb_obj_extend(mrb_state *mrb, int argc, mrb_value *argv, mrb_value obj)
  *     k.extend(Mod)   #=> #<Klass:0x401b3bc8>
  *     k.hello         #=> "Hello from Mod.\n"
  */
-mrb_value
+static mrb_value
 mrb_obj_extend_m(mrb_state *mrb, mrb_value self)
 {
   mrb_value *argv;
@@ -462,7 +462,7 @@ mrb_obj_hash(mrb_state *mrb, mrb_value self)
 }
 
 /* 15.3.1.3.16 */
-mrb_value
+static mrb_value
 mrb_obj_init_copy(mrb_state *mrb, mrb_value self)
 {
   mrb_value orig;
@@ -496,7 +496,7 @@ mrb_obj_init_copy(mrb_state *mrb, mrb_value self)
  *     k = KlassWithSecret.new
  *     k.instance_eval { @secret }   #=> 99
  */
-mrb_value
+static mrb_value
 mrb_obj_instance_eval(mrb_state *mrb, mrb_value self)
 {
   mrb_value a, b;
@@ -573,8 +573,10 @@ get_valid_iv_sym(mrb_state *mrb, mrb_value iv_name)
   mrb_assert(mrb_symbol_p(iv_name) || mrb_string_p(iv_name));
 
   if (mrb_string_p(iv_name)) {
-    iv_name_id = mrb_intern(mrb, RSTRING_PTR(iv_name), RSTRING_LEN(iv_name));
-    valid_iv_name(mrb, iv_name_id, RSTRING_PTR(iv_name), RSTRING_LEN(iv_name));
+    char *p = RSTRING_PTR(iv_name);
+    mrb_int l = RSTRING_LEN(iv_name);
+    iv_name_id = mrb_intern(mrb, p, l);
+    valid_iv_name(mrb, iv_name_id, p, l);
   }
   else {
     iv_name_id = mrb_symbol(iv_name);
@@ -602,7 +604,7 @@ get_valid_iv_sym(mrb_state *mrb, mrb_value iv_name)
  *     fred.instance_variable_defined?("@b")   #=> true
  *     fred.instance_variable_defined?("@c")   #=> false
  */
-mrb_value
+static mrb_value
 mrb_obj_ivar_defined(mrb_state *mrb, mrb_value self)
 {
   mrb_sym mid;
@@ -636,7 +638,7 @@ mrb_obj_ivar_defined(mrb_state *mrb, mrb_value self)
  *     fred.instance_variable_get(:@a)    #=> "cat"
  *     fred.instance_variable_get("@b")   #=> 99
  */
-mrb_value
+static mrb_value
 mrb_obj_ivar_get(mrb_state *mrb, mrb_value self)
 {
   mrb_sym iv_name_id;
@@ -668,7 +670,7 @@ mrb_obj_ivar_get(mrb_state *mrb, mrb_value self)
  *     fred.instance_variable_set(:@c, 'cat')   #=> "cat"
  *     fred.inspect                             #=> "#<Fred:0x401b3da8 @a=\"dog\", @b=99, @c=\"cat\">"
  */
-mrb_value
+static mrb_value
 mrb_obj_ivar_set(mrb_state *mrb, mrb_value self)
 {
   mrb_sym iv_name_id;
@@ -708,7 +710,7 @@ mrb_obj_ivar_set(mrb_state *mrb, mrb_value self)
  *     b.kind_of? C       #=> false
  *     b.kind_of? M       #=> true
  */
-mrb_value
+static mrb_value
 mrb_obj_is_kind_of_m(mrb_state *mrb, mrb_value self)
 {
   mrb_value arg;
@@ -769,7 +771,7 @@ mrb_class_instance_method_list(mrb_state *mrb, mrb_bool recur, struct RClass* kl
   return ary;
 }
 
-mrb_value
+static mrb_value
 mrb_obj_singleton_methods(mrb_state *mrb, mrb_bool recur, mrb_value obj)
 {
   khint_t i;
@@ -801,7 +803,7 @@ mrb_obj_singleton_methods(mrb_state *mrb, mrb_bool recur, mrb_value obj)
   return ary;
 }
 
-mrb_value
+static mrb_value
 mrb_obj_methods(mrb_state *mrb, mrb_bool recur, mrb_value obj, mrb_method_flag_t flag)
 {
   if (recur)
@@ -828,7 +830,7 @@ mrb_obj_methods(mrb_state *mrb, mrb_bool recur, mrb_value obj, mrb_method_flag_t
  *                        #    :methods, :extend, :__send__, :instance_eval]
  *     k.methods.length   #=> 42
  */
-mrb_value
+static mrb_value
 mrb_obj_methods_m(mrb_state *mrb, mrb_value self)
 {
   mrb_bool recur = TRUE;
@@ -844,7 +846,7 @@ mrb_obj_methods_m(mrb_state *mrb, mrb_value self)
  *
  * Only the object <i>nil</i> responds <code>true</code> to <code>nil?</code>.
  */
-mrb_value
+static mrb_value
 mrb_false(mrb_state *mrb, mrb_value self)
 {
   return mrb_false_value();
@@ -859,7 +861,7 @@ mrb_false(mrb_state *mrb, mrb_value self)
  *  the <i>all</i> parameter is set to <code>false</code>, only those methods
  *  in the receiver will be listed.
  */
-mrb_value
+static mrb_value
 mrb_obj_private_methods(mrb_state *mrb, mrb_value self)
 {
   mrb_bool recur = TRUE;
@@ -876,7 +878,7 @@ mrb_obj_private_methods(mrb_state *mrb, mrb_value self)
  *  the <i>all</i> parameter is set to <code>false</code>, only those methods
  *  in the receiver will be listed.
  */
-mrb_value
+static mrb_value
 mrb_obj_protected_methods(mrb_state *mrb, mrb_value self)
 {
   mrb_bool recur = TRUE;
@@ -893,7 +895,7 @@ mrb_obj_protected_methods(mrb_state *mrb, mrb_value self)
  *  the <i>all</i> parameter is set to <code>false</code>, only those methods
  *  in the receiver will be listed.
  */
-mrb_value
+static mrb_value
 mrb_obj_public_methods(mrb_state *mrb, mrb_value self)
 {
   mrb_bool recur = TRUE;
@@ -922,7 +924,7 @@ mrb_obj_public_methods(mrb_state *mrb, mrb_value self)
  *     raise "Failed to create socket"
  *     raise ArgumentError, "No parameters", caller
  */
-mrb_value
+static mrb_value
 mrb_f_raise(mrb_state *mrb, mrb_value self)
 {
   mrb_value a[2], exc;
@@ -972,7 +974,7 @@ mrb_f_raise(mrb_state *mrb, mrb_value self)
  *     d.remove   #=> 99
  *     d.var      #=> nil
  */
-mrb_value
+static mrb_value
 mrb_obj_remove_instance_variable(mrb_state *mrb, mrb_value self)
 {
   mrb_sym sym;
@@ -1089,7 +1091,7 @@ obj_respond_to(mrb_state *mrb, mrb_value self)
  *     a.singleton_methods(false)  #=> [:two, :one]
  *     a.singleton_methods         #=> [:two, :one, :three]
  */
-mrb_value
+static mrb_value
 mrb_obj_singleton_methods_m(mrb_state *mrb, mrb_value self)
 {
   mrb_bool recur = TRUE;
@@ -1137,7 +1139,7 @@ mrb_init_kernel(mrb_state *mrb)
 {
   struct RClass *krn;
 
-  krn = mrb->kernel_module = mrb_define_module(mrb, "Kernel");
+  krn = mrb->kernel_module = mrb_define_module(mrb, "Kernel");                                                    /* 15.3.1 */
   mrb_define_class_method(mrb, krn, "block_given?",         mrb_f_block_given_p_m,           MRB_ARGS_NONE());    /* 15.3.1.2.2  */
   mrb_define_class_method(mrb, krn, "global_variables",     mrb_f_global_variables,          MRB_ARGS_NONE());    /* 15.3.1.2.4  */
   mrb_define_class_method(mrb, krn, "iterator?",            mrb_f_block_given_p_m,           MRB_ARGS_NONE());    /* 15.3.1.2.5  */
