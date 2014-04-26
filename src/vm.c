@@ -1464,9 +1464,9 @@ RETRY_TRY_BLOCK:
         cipop(mrb);
         acc = ci->acc;
         pc = ci->pc;
-        MRB_VM_GC_LOCK_AND_DEFINE(mrb);
-        regs = mrb->c->stack = ci->stackent;
         if (acc == CI_ACC_SKIP) {
+          MRB_VM_GC_LOCK_AND_DEFINE(mrb);
+          regs = mrb->c->stack = ci->stackent;
           mrb->jmp = prev_jmp;
 #ifdef ENABLE_THREAD
           if (mrb->thread_table) {
@@ -1483,6 +1483,7 @@ RETRY_TRY_BLOCK:
           MRB_VM_GC_UNLOCK_IF_LOCKED(mrb);
           return v;
         }
+        regs = mrb->c->stack = ci->stackent;
         DEBUG(printf("from :%s\n", mrb_sym2name(mrb, ci->mid)));
         proc = mrb->c->ci->proc;
         irep = proc->body.irep;
@@ -1490,7 +1491,6 @@ RETRY_TRY_BLOCK:
         syms = irep->syms;
 
         regs[acc] = v;
-        MRB_VM_GC_UNLOCK_IF_LOCKED(mrb);
       }
       JUMP;
     }
