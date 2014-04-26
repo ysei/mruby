@@ -87,4 +87,9 @@
 # define TRUE 1
 #endif
 
+
+#define ENABLE_THREAD
+#define ENABLE_METHOD_CACHE
+
+
 #endif  /* MRUBYCONF_H */

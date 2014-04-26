@@ -15,6 +15,100 @@ extern "C" {
 #include <windows.h>
 #endif
 
+
+/*
+http://lists.freebsd.org/pipermail/freebsd-chromium/2011-April/000127.html
+
+[SVN-Commit] r544 - in branches/experimental/www/firefox-devel: . files
+Pan Tsu inyaoo at gmail.com 
+Fri Apr 29 01:11:33 UTC 2011 
+
+svn-freebsd-gecko at chruetertee.ch writes:
+
+> Author: flo
+> Date: Thu Apr 28 23:19:55 2011
+> New Revision: 544
+>
+> Log:
+> - add a new firefox-devel port which contains a snapshot of the Mozilla Firefox
+>   Aurora Channel. Mozilla does not provide source tar balls for this channel
+>   we will create snapshots on a regular basis.
+
+> - enable ipc, based on a patch by Pan Tsu <inyaoo at gmail.com>
+[...]
+>  #elif defined(OS_LINUX)
+> -  return syscall(__NR_gettid);
+> +  // TODO(BSD): find a better thread ID
+> +  return reinterpret_cast<int64>(pthread_self());
+>  #endif
+
+Why not use undocumented thr_self(2) syscall like emulators/wine does?
+
+  $ ./test
+  pthread_self() = 159413248
+  thr_self() = 101107
+  pthread_getthreadid_np() = 101107
+  procstat -t = 101107
+
+  // wine-1.3.18/dlls/ntdll/server.c
+  static int get_unix_tid(void)
+  {
+      int ret = -1;
+  #ifdef linux
+      ret = syscall( SYS_gettid );
+  #elif defined(__sun)
+      ret = pthread_self();
+  #elif defined(__APPLE__)
+      ret = mach_thread_self();
+      mach_port_deallocate(mach_task_self(), ret);
+  #elif defined(__FreeBSD__)
+      long lwpid;
+      thr_self( &lwpid );
+      ret = lwpid;
+  #endif
+      return ret;
+  }
+
+%%
+Index: www/firefox-devel/files/patch-ipc-chromium-src-base-platform_thread_posix.cc
+===================================================================
+--- www/firefox-devel/files/patch-ipc-chromium-src-base-platform_thread_posix.cc	(revision 544)
++++ www/firefox-devel/files/patch-ipc-chromium-src-base-platform_thread_posix.cc	(working copy)
+@@ -1,12 +1,25 @@
+ --- ipc/chromium/src/base/platform_thread_posix.cc.orig	2011-04-27 09:34:28.000000000 +0200
+ +++ ipc/chromium/src/base/platform_thread_posix.cc	2011-04-27 19:47:36.344446266 +0200
+-@@ -34,7 +33,8 @@
++@@ -10,6 +10,7 @@
++ #include <mach/mach.h>
++ #elif defined(OS_LINUX)
++ #include <sys/syscall.h>
+++#include <pthread_np.h>
++ #include <unistd.h>
++ #endif
++ 
++@@ -34,7 +33,13 @@ PlatformThreadId PlatformThread::Current
+  #if defined(OS_MACOSX)
+    return mach_thread_self();
+  #elif defined(OS_LINUX)
+ -  return syscall(__NR_gettid);
+-+  // TODO(BSD): find a better thread ID
+-+  return reinterpret_cast<int64>(pthread_self());
+++  long lwpid;
+++#if __FreeBSD_version < 900031
+++  thr_self(&lwpid);
+++#else
+++  lwpid = pthread_getthreadid_np();
+++#endif
+++  return lwpid;
+  #endif
+  }
+  
+%%
+*/
+
+#include <sys/thr.h>	/* FreeBSD */
+
+
 typedef union mrb_gem_thread_t {
   void * handle;
 #ifdef USE_POSIX_THREAD
@@ -99,7 +193,19 @@ extern int mrb_lock_lock(struct mrb_state *mrb, mrb_lock_t *lock);
 extern int mrb_lock_unlock(struct mrb_state *mrb, mrb_lock_t *lock);
 #include <unistd.h>
 #include <sys/syscall.h>
+
+
+/*
 static inline pid_t gettid() { return syscall(SYS_gettid); }
+static inline pid_t gettid() { return syscall((size_t)thr_self); }
+static inline pid_t gettid() { return (size_t)thr_self; }
+static inline pid_t gettid() { uint64_t thptr; uint64_t volatile thptr128; thr_self(&thptr); return thptr; }
+static inline pid_t gettid() { long thptr; long volatile thptr64; uint64_t volatile thptr128; (long)thr_self(&thptr); return thptr; }
+static inline pid_t gettid() { long volatile thptr; long volatile thptr64; uint64_t volatile thptr128; thr_self(&thptr); return thptr; }
+*/
+static inline pid_t gettid() { long volatile thptr; long volatile thptr64; uint64_t volatile thptr128; (unsigned)thr_self(&thptr); return thptr; }
+
+
 #define MRB_LOCK_INIT(mrb, lock)               mrb_lock_init(mrb, lock)
 #define MRB_LOCK_DESTROY(mrb, lock)            mrb_lock_destroy(mrb, lock)
 #define MRB_LOCK_LOCK(mrb, lock)               (var_lock_status_ = mrb_lock_lock(mrb, lock))
