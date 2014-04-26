@@ -198,6 +198,7 @@ kh_fill_flags(uint8_t *p, uint8_t c, size_t len)
     while (!__ac_isempty(h->ed_flags, k)) {                             \
       if (!__ac_isdel(h->ed_flags, k)) {                                \
         if (__hash_equal(mrb,h->keys[k], key)) {                        \
+          MRB_LOCK_UNLOCK_IF_LOCKED(mrb, &h->lock);                     \
           if (ret) *ret = 0;                                            \
           return k;                                                     \
         }                                                               \
