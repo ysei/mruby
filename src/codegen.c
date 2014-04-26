@@ -719,7 +719,7 @@ attrsym(codegen_scope *s, mrb_sym a)
                                  + 1 /* '=' */
                                  + 1 /* '\0' */
                                  );
-  mrb_assert(len <= SIZE_MAX);
+  mrb_assert_int_fit(mrb_int, len, size_t, SIZE_MAX);
   memcpy(name2, name, (size_t)len);
   name2[len] = '=';
   name2[len+1] = '\0';
@@ -1448,7 +1448,7 @@ codegen(codegen_scope *s, node *tree, int val)
     codegen(s, tree->cdr, val);
     if (val) {
       pop(); pop();
-      genop(s, MKOP_ABC(OP_RANGE, cursp(), cursp(), 0));
+      genop(s, MKOP_ABC(OP_RANGE, cursp(), cursp(), FALSE));
       push();
     }
     break;
@@ -1458,7 +1458,7 @@ codegen(codegen_scope *s, node *tree, int val)
     codegen(s, tree->cdr, val);
     if (val) {
       pop(); pop();
-      genop(s, MKOP_ABC(OP_RANGE, cursp(), cursp(), 1));
+      genop(s, MKOP_ABC(OP_RANGE, cursp(), cursp(), TRUE));
       push();
     }
     break;
@@ -2635,8 +2635,7 @@ codedump(mrb_state *mrb, mrb_irep *irep)
   printf("irep %p nregs=%d nlocals=%d pools=%d syms=%d reps=%d\n", irep,
          irep->nregs, irep->nlocals, (int)irep->plen, (int)irep->slen, (int)irep->rlen);
 
-  mrb_assert(irep->ilen <= INT_MAX);
-  for (i = 0; i < (int)(irep->ilen); i++) {
+  for (i = 0; i < (int)irep->ilen; i++) {
     ai = mrb_gc_arena_save(mrb);
     printf("%03d ", i);
     c = irep->iseq[i];
