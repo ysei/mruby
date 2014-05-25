@@ -293,3 +293,23 @@ end
 assert('optional block argument in the rhs default expressions') do
   assert_nil(Proc.new {|foo = foo| foo}.call)
 end
+
+assert('multiline comments work correctly') do
+=begin
+this is a comment with nothing after begin and end
+=end
+=begin  this is a comment 
+this is a comment with extra after =begin
+=end
+=begin
+this is a comment that has =end with spaces after it
+=end  
+=begin this is a comment
+this is a comment that has extra after =begin and =end with spaces after it
+=end  
+  line = __LINE__
+=begin	this is a comment
+this is a comment that has extra after =begin and =end with tabs after it
+=end	xxxxxxxxxxxxxxxxxxxxxxxxxx
+  assert_equal(line + 4, __LINE__)
+end

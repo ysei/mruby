@@ -9,6 +9,7 @@
 #include "mruby/data.h"
 #include "mruby/class.h"
 #include "mruby/re.h"
+#include "mruby/irep.h"
 
 struct RData*
 mrb_data_object_alloc(mrb_state *mrb, struct RClass *klass, void *ptr, const mrb_data_type *type)
@@ -108,7 +109,7 @@ mrb_obj_id(mrb_value obj)
 {
   mrb_int tt = mrb_type(obj);
 
-#define MakeID2(p,t) (((intptr_t)(p))^(t))
+#define MakeID2(p,t) (mrb_int)(((intptr_t)(p))^(t))
 #define MakeID(p)    MakeID2(p,tt)
 
   switch (tt) {

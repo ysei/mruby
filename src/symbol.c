@@ -45,11 +45,11 @@ sym_intern(mrb_state *mrb, const char *name, size_t len, mrb_bool lit)
   mrb_sym sym;
   char *p;
 
-  if (len > UINT16_MAX) {
+  if (len > (UINT16_MAX-1)) {   /* UINT16_MAX is reverved */
     mrb_raise(mrb, E_ARGUMENT_ERROR, "symbol length too long");
   }
   sname.lit = lit;
-  sname.len = len;
+  sname.len = (uint16_t)len;
   sname.name = name;
 
   k = kh_get(n2s, mrb, h, sname);
@@ -116,7 +116,7 @@ mrb_check_intern(mrb_state *mrb, const char *name, size_t len)
   if (len > UINT16_MAX) {
     mrb_raise(mrb, E_ARGUMENT_ERROR, "symbol length too long");
   }
-  sname.len = len;
+  sname.len = (uint16_t)len;
   sname.name = name;
 
   k = kh_get(n2s, mrb, h, sname);

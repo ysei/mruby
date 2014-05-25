@@ -112,3 +112,21 @@ assert('Struct#length, Struct#size') do
   assert_equal 2, s.size
   assert_equal 2, s.length
 end
+
+assert('Struct#to_a, Struct#values') do
+  s = Struct.new(:mem1, :mem2).new('a', 'b')
+  assert_equal ['a', 'b'], s.to_a
+  assert_equal ['a', 'b'], s.values
+end
+
+assert('Struct#to_h') do
+  s = Struct.new(:white, :red, :green).new('ruuko', 'yuzuki', 'hitoe')
+  assert_equal(:white => 'ruuko', :red => 'yuzuki', :green => 'hitoe') { s.to_h }
+end
+
+assert('Struct#values_at') do
+  a = Struct.new(:blue, :purple).new('aki', 'io')
+  assert_equal ['aki'], a.values_at(0)
+  assert_equal ['io', 'aki'], a.values_at(1, 0)
+  assert_raise(IndexError) { a.values_at 2 }
+end

@@ -7,7 +7,7 @@
 #include "mruby.h"
 #include "mruby/class.h"
 #include "mruby/proc.h"
-#include "opcode.h"
+#include "mruby/opcode.h"
 
 static mrb_code call_iseq[] = {
   MKOP_A(OP_CALL, 0),
@@ -91,7 +91,7 @@ mrb_proc_copy(struct RProc *a, struct RProc *b)
   a->body = b->body;
   if (!MRB_PROC_CFUNC_P(a)) {
     a->body.irep->refcnt++;
-  };
+  }
   a->target_class = b->target_class;
   a->env = b->env;
 }

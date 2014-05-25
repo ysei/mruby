@@ -401,7 +401,7 @@ mrb_ary_push(mrb_state *mrb, mrb_value ary, mrb_value elem)
   if (a->len == a->aux.capa)
     ary_expand_capa(mrb, a, a->len + 1);
   a->ptr[a->len++] = elem;
-  mrb_write_barrier(mrb, (struct RBasic*)a);
+  mrb_field_write_barrier_value(mrb, (struct RBasic*)a, elem);
 }
 
 static mrb_value
@@ -484,7 +484,7 @@ mrb_ary_unshift(mrb_state *mrb, mrb_value self, mrb_value item)
     a->ptr[0] = item;
   }
   a->len++;
-  mrb_write_barrier(mrb, (struct RBasic*)a);
+  mrb_field_write_barrier_value(mrb, (struct RBasic*)a, item);
 
   return self;
 }
@@ -511,7 +511,9 @@ mrb_ary_unshift_m(mrb_state *mrb, mrb_value self)
   }
   array_copy(a->ptr, vals, len);
   a->len += len;
-  mrb_write_barrier(mrb, (struct RBasic*)a);
+  while (len--) {
+    mrb_field_write_barrier_value(mrb, (struct RBasic*)a, vals[len]);
+  }
 
   return self;
 }
@@ -549,7 +551,7 @@ mrb_ary_set(mrb_state *mrb, mrb_value ary, mrb_int n, mrb_value val)
   }
 
   a->ptr[n] = val;
-  mrb_write_barrier(mrb, (struct RBasic*)a);
+  mrb_field_write_barrier_value(mrb, (struct RBasic*)a, val);
 }
 
 mrb_value
@@ -561,6 +563,10 @@ mrb_ary_splice(mrb_state *mrb, mrb_value ary, mrb_int head, mrb_int len, mrb_val
   mrb_int i, argc;
 
   ary_modify(mrb, a);
+
+  /* len check */
+  if (len < 0) mrb_raisef(mrb, E_INDEX_ERROR, "negative length (%S)", mrb_fixnum_value(len));
+
   /* range check */
   if (head < 0) {
     head += a->len;
@@ -597,6 +603,7 @@ mrb_ary_splice(mrb_state *mrb, mrb_value ary, mrb_int head, mrb_int len, mrb_val
 
   for (i = 0; i < argc; i++) {
     *(a->ptr + head + i) = *(argv + i);
+    mrb_field_write_barrier_value(mrb, (struct RBasic*)a, argv[i]);
   }
 
   a->len = size;
@@ -946,7 +953,7 @@ join_ary(mrb_state *mrb, mrb_value ary, mrb_value sep, mrb_value list)
 
   for (i=0; i<RARRAY_LEN(ary); i++) {
     if (i > 0 && !mrb_nil_p(sep)) {
-      mrb_str_buf_append(mrb, result, sep);
+      mrb_str_cat_str(mrb, result, sep);
     }
 
     val = RARRAY_PTR(ary)[i];
@@ -958,7 +965,7 @@ join_ary(mrb_state *mrb, mrb_value ary, mrb_value sep, mrb_value list)
 
     case MRB_TT_STRING:
     str_join:
-      mrb_str_buf_append(mrb, result, val);
+      mrb_str_cat_str(mrb, result, val);
       break;
 
     default:
