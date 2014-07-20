@@ -12,18 +12,18 @@ extern "C" {
 #endif
 
 typedef struct global_variable {
-    int   counter;
-    mrb_value *data;
-    mrb_value (*getter)(void);
-    void  (*setter)(void);
-    //void  (*marker)();
-    //int block_trace;
-    //struct trace_var *trace;
+  int   counter;
+  mrb_value *data;
+  mrb_value (*getter)(void);
+  void  (*setter)(void);
+  /* void  (*marker)(); */
+  /* int block_trace; */
+  /* struct trace_var *trace; */
 } global_variable;
 
 struct global_entry {
-    global_variable *var;
-    mrb_sym id;
+  global_variable *var;
+  mrb_sym id;
 };
 
 mrb_value mrb_vm_special_get(mrb_state*, mrb_sym);
@@ -48,7 +48,7 @@ void mrb_iv_set(mrb_state *mrb, mrb_value obj, mrb_sym sym, mrb_value v);
 mrb_bool mrb_iv_defined(mrb_state*, mrb_value, mrb_sym);
 mrb_value mrb_iv_remove(mrb_state *mrb, mrb_value obj, mrb_sym sym);
 void mrb_iv_copy(mrb_state *mrb, mrb_value dst, mrb_value src);
-int mrb_const_defined_at(mrb_state *mrb, struct RClass *klass, mrb_sym id);
+mrb_bool mrb_const_defined_at(mrb_state *mrb, struct RClass *klass, mrb_sym id);
 mrb_value mrb_mod_constants(mrb_state *mrb, mrb_value mod);
 mrb_value mrb_f_global_variables(mrb_state *mrb, mrb_value self);
 mrb_value mrb_gv_get(mrb_state *mrb, mrb_sym sym);

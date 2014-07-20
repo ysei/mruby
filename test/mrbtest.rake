@@ -8,10 +8,15 @@ MRuby.each_target do
   mlib = clib.ext(exts.object)
   mrbs = Dir.glob("#{current_dir}/t/*.rb")
   init = "#{current_dir}/init_mrbtest.c"
-  asslib = "#{current_dir}/assert.rb"
+  ass_c = "#{current_build_dir}/assert.c"
+  ass_lib = ass_c.ext(exts.object)
 
   mrbtest_lib = libfile("#{current_build_dir}/mrbtest")
-  file mrbtest_lib => [mlib, gems.map(&:test_objs), gems.map { |g| g.test_rbireps.ext(exts.object) }].flatten do |t|
+  mrbtest_objs = [mlib, ass_lib]
+  gems.each do |v|
+    mrbtest_objs.concat v.test_objs
+  end
+  file mrbtest_lib => mrbtest_objs do |t|
     archiver.run t.name, t.prerequisites
   end
 
@@ -27,13 +32,30 @@ MRuby.each_target do
     end
   end
 
-  file mlib => [clib]
-  file clib => [mrbcfile, init, asslib] + mrbs do |t|
+  file ass_lib => ass_c
+  file ass_c => ["#{current_dir}/assert.rb", __FILE__] do |t|
+    FileUtils.mkdir_p File.dirname t.name
+    open(t.name, 'w') do |f|
+      mrbc.run f, [t.prerequisites.first], 'mrbtest_assert_irep'
+    end
+  end
+
+  file mlib => clib
+  file clib => [mrbcfile, init, __FILE__] + mrbs do |t|
     _pp "GEN", "*.rb", "#{clib.relative_path}"
     FileUtils.mkdir_p File.dirname(clib)
     open(clib, 'w') do |f|
+      f.puts %Q[/*]
+      f.puts %Q[ * This file contains a list of all]
+      f.puts %Q[ * test functions.]
+      f.puts %Q[ *]
+      f.puts %Q[ * IMPORTANT:]
+      f.puts %Q[ *   This file was generated!]
+      f.puts %Q[ *   All manual changes will get lost.]
+      f.puts %Q[ */]
+      f.puts %Q[]
       f.puts IO.read(init)
-      mrbc.run f, [asslib] + mrbs, 'mrbtest_irep'
+      mrbc.run f, mrbs, 'mrbtest_irep'
       gems.each do |g|
         f.puts %Q[void GENERATED_TMP_mrb_#{g.funcname}_gem_test(mrb_state *mrb);]
       end

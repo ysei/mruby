@@ -5,10 +5,6 @@ assert('Array', '15.2.12') do
   assert_equal(Class, Array.class)
 end
 
-assert('Array superclass', '15.2.12.2') do
-  assert_equal(Object, Array.superclass)
-end
-
 assert('Array inclueded modules', '15.2.12.3') do
   assert_true(Array.include?(Enumerable))
 end
@@ -51,9 +47,9 @@ assert('Array#[]', '15.2.12.5.4') do
   assert_equal(nil, [1,2,3].[](-4))
 
   a = [ "a", "b", "c", "d", "e" ]
-  a[1.1]   == "b" and
-  a[1,2]   == ["b", "c"] and
-  a[1..-2] == ["b", "c", "d"]
+  assert_equal("b", a[1.1])
+  assert_equal(["b", "c"], a[1,2])
+  assert_equal(["b", "c", "d"], a[1..-2])
 end
 
 assert('Array#[]=', '15.2.12.5.5') do
@@ -65,6 +61,11 @@ assert('Array#[]=', '15.2.12.5.5') do
   assert_raise(ArgumentError) do
     # this will cause an exception due to the wrong arguments
     a.[]=(1,2,3,4)
+  end
+  assert_raise(IndexError) do
+    # this will cause an exception due to the wrong arguments
+    a = [1,2,3,4,5]
+    a[1, -1] = 10
   end
 
   assert_equal(4, [1,2,3].[]=(1,4))

@@ -28,7 +28,7 @@ mrb_class(mrb_state *mrb, mrb_value v)
 {
   switch (mrb_type(v)) {
   case MRB_TT_FALSE:
-    if (v.value.i)
+    if (mrb_fixnum(v))
       return mrb->false_class;
     return mrb->nil_class;
   case MRB_TT_TRUE:
@@ -41,6 +41,8 @@ mrb_class(mrb_state *mrb, mrb_value v)
     return mrb->float_class;
   case MRB_TT_CPTR:
     return mrb->object_class;
+  case MRB_TT_ENV:
+    return NULL;
   default:
     return mrb_obj_ptr(v)->c;
   }

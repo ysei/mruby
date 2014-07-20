@@ -10,12 +10,26 @@ class Range
   #
   # ISO 15.2.14.4.4
   def each(&block)
+    return to_enum :each unless block_given?
+
     val = self.first
+    last = self.last
+
+    if val.kind_of?(Fixnum) && last.kind_of?(Fixnum) # fixnums are special
+      lim = last
+      lim += 1 unless exclude_end?
+      i = val
+      while i < lim
+        block.call(i)
+        i += 1
+      end
+      return self
+    end
+
     unless val.respond_to? :succ
       raise TypeError, "can't iterate"
     end
 
-    last = self.last
     return self if (val <=> last) > 0
 
     while((val <=> last) < 0)
@@ -43,7 +57,6 @@ end
 # Range is enumerable
 #
 # ISO 15.2.14.3
-module Enumerable; end
 class Range
   include Enumerable
 end
