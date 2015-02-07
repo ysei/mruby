@@ -74,6 +74,18 @@ mrb_open_core(mrb_allocf f, void *ud)
   return mrb;
 }
 
+#ifdef MRB_USE_THREAD_API
+MRB_API mrb_state*
+mrb_duplicate_core(mrb_state *mrb)
+{
+  mrb_state *dup;
+  dup = (mrb_state *)mrb_malloc(mrb, sizeof(mrb_state));
+  *dup = *mrb;
+  MRB_GET_THREAD_CONTEXT(dup) = mrb_alloc_thread_context(mrb);
+  return dup;
+}
+#endif
+
 void*
 mrb_default_allocf(mrb_state *mrb, void *p, size_t size, void *ud)
 {
@@ -281,6 +293,19 @@ mrb_close(mrb_state *mrb)
   mrb_free(mrb, MRB_GET_VM(mrb));
   mrb_free(mrb, mrb);
 }
+
+#ifdef MRB_USE_THREAD_API
+MRB_API void
+mrb_close_duplicated(mrb_state *mrb)
+{
+  mrb_free_context(mrb, MRB_GET_ROOT_CONTEXT(mrb));
+#ifndef MRB_GC_FIXED_ARENA
+  mrb_free(mrb, MRB_GET_THREAD_CONTEXT(mrb)->arena);
+#endif
+  mrb_free(mrb, MRB_GET_THREAD_CONTEXT(mrb));
+  mrb_free(mrb, mrb);
+}
+#endif
 
 MRB_API mrb_irep*
 mrb_add_irep(mrb_state *mrb)

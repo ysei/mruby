@@ -72,13 +72,21 @@ mrb_gvl_is_acquired(mrb_state *mrb)
 
 MRB_API void
 mrb_gvl_acquire_dbg(mrb_state *mrb, char const *file, int line, char const *func) {
+#ifdef MRB_USE_THREAD_API
+  fprintf(stderr, "GVL: acquire in %s %s:%d (in Thread-#%d)\n", func, file, line, MRB_GET_THREAD_CONTEXT(mrb)->id);
+#else
   fprintf(stderr, "GVL: acquire in %s %s:%d\n", func, file, line);
+#endif
   mrb_gvl_acquire(mrb);
 }
 
 MRB_API void
 mrb_gvl_release_dbg(mrb_state *mrb, char const *file, int line, char const *func) {
+#ifdef MRB_USE_THREAD_API
+  fprintf(stderr, "GVL: release in %s %s:%d (in Thread-#%d)\n", func, file, line, MRB_GET_THREAD_CONTEXT(mrb)->id);
+#else
   fprintf(stderr, "GVL: release in %s %s:%d\n", func, file, line);
+#endif
   mrb_gvl_release(mrb);
 }
 

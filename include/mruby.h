@@ -201,6 +201,10 @@ typedef struct mrb_thread_context {
 #ifdef MRB_USE_GVL_API
   mrb_bool flag_gvl_acquired;
 #endif
+
+#ifdef MRB_USE_THREAD_API
+  mrb_int id;
+#endif
 } mrb_thread_context;
 
 /*
@@ -332,6 +336,10 @@ MRB_API mrb_state* mrb_open(void);
 MRB_API mrb_state* mrb_open_allocf(mrb_allocf, void *ud);
 MRB_API mrb_state* mrb_open_core(mrb_allocf, void *ud);
 MRB_API void mrb_close(mrb_state*);
+#ifdef MRB_USE_THREAD_API
+MRB_API mrb_state* mrb_duplicate_core(mrb_state *mrb);
+MRB_API void mrb_close_duplicated(mrb_state* mrb);
+#endif
 
 MRB_API void* mrb_default_allocf(mrb_state*, void*, size_t, void*);
 
