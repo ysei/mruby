@@ -113,6 +113,11 @@ typedef void (*mrb_atexit_func)(struct mrb_state*);
  */
 typedef struct mrb_vm_context {
   struct RObject *exc;                    /* exception */
+
+#ifdef MRB_USE_GVL_API
+  struct mrb_gvl_t *gvl;                  /* giant VM lock */
+#endif
+
   struct iv_tbl *globals;                 /* global variable table */
 
   struct RObject *top_self;
@@ -192,6 +197,10 @@ typedef struct mrb_thread_context {
   int arena_capa;
 #endif
   int arena_idx;
+
+#ifdef MRB_USE_GVL_API
+  mrb_bool flag_gvl_acquired;
+#endif
 } mrb_thread_context;
 
 /*

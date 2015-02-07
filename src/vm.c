@@ -19,6 +19,7 @@
 #include "mruby/variable.h"
 #include "mruby/error.h"
 #include "mruby/opcode.h"
+#include "mruby/gvl.h"
 #include "value_array.h"
 #include "mrb_throw.h"
 
@@ -295,7 +296,17 @@ mrb_funcall(mrb_state *mrb, mrb_value self, const char *name, mrb_int argc, ...)
   mrb_value argv[MRB_FUNCALL_ARGC_MAX];
   va_list ap;
   mrb_int i;
-  mrb_sym mid = mrb_intern_cstr(mrb, name);
+  mrb_sym mid;
+  mrb_value val;
+#ifdef MRB_USE_GVL_API
+  const mrb_bool is_gvl_acquired = mrb_gvl_is_acquired(mrb);
+
+  if (!is_gvl_acquired) {
+    mrb_gvl_acquire(mrb);
+  }
+#endif
+
+  mid = mrb_intern_cstr(mrb, name);
 
   if (argc > MRB_FUNCALL_ARGC_MAX) {
     mrb_raise(mrb, E_ARGUMENT_ERROR, "Too long arguments. (limit=" MRB_STRINGIZE(MRB_FUNCALL_ARGC_MAX) ")");
@@ -306,13 +317,28 @@ mrb_funcall(mrb_state *mrb, mrb_value self, const char *name, mrb_int argc, ...)
     argv[i] = va_arg(ap, mrb_value);
   }
   va_end(ap);
-  return mrb_funcall_argv(mrb, self, mid, argc, argv);
+
+  val = mrb_funcall_argv(mrb, self, mid, argc, argv);
+
+#ifdef MRB_USE_GVL_API
+  if (!is_gvl_acquired) {
+    mrb_gvl_release(mrb);
+  }
+#endif
+  return val;
 }
 
 MRB_API mrb_value
 mrb_funcall_with_block(mrb_state *mrb, mrb_value self, mrb_sym mid, mrb_int argc, const mrb_value *argv, mrb_value blk)
 {
   mrb_value val;
+#ifdef MRB_USE_GVL_API
+  const mrb_bool is_gvl_acquired = mrb_gvl_is_acquired(mrb);
+
+  if (!is_gvl_acquired) {
+    mrb_gvl_acquire(mrb);
+  }
+#endif
 
   if (!MRB_GET_THREAD_CONTEXT(mrb)->jmp) {
     struct mrb_jmpbuf c_jmp;
@@ -398,6 +424,11 @@ mrb_funcall_with_block(mrb_state *mrb, mrb_value self, mrb_sym mid, mrb_int argc
     }
   }
   mrb_gc_protect(mrb, val);
+#ifdef MRB_USE_GVL_API
+  if (!is_gvl_acquired) {
+    mrb_gvl_release(mrb);
+  }
+#endif
   return val;
 }
 
@@ -462,7 +493,9 @@ mrb_f_send(mrb_state *mrb, mrb_value self)
   }
 
   if (MRB_PROC_CFUNC_P(p)) {
-    return p->body.func(mrb, self);
+    mrb_value ret;
+    ret = p->body.func(mrb, self);
+    return ret;
   }
 
   ci->nregs = p->body.irep->nregs;
@@ -493,7 +526,9 @@ eval_under(mrb_state *mrb, mrb_value self, mrb_value blk, struct RClass *c)
   p = mrb_proc_ptr(blk);
   ci->proc = p;
   if (MRB_PROC_CFUNC_P(p)) {
-    return p->body.func(mrb, self);
+    mrb_value ret;
+    ret = p->body.func(mrb, self);
+    return ret;
   }
   ci->nregs = p->body.irep->nregs;
   ci = cipush(mrb);
@@ -580,6 +615,9 @@ mrb_yield_with_class(mrb_state *mrb, mrb_value b, mrb_int argc, const mrb_value 
   mrb_callinfo *ci;
   int n = MRB_GET_CONTEXT(mrb)->ci->nregs;
   mrb_value val;
+#ifdef MRB_USE_GVL_API
+  const mrb_bool is_gvl_acquired = mrb_gvl_is_acquired(mrb);
+#endif
 
   if (mrb_nil_p(b)) {
     mrb_raise(mrb, E_ARGUMENT_ERROR, "no block given");
@@ -608,6 +646,12 @@ mrb_yield_with_class(mrb_state *mrb, mrb_value b, mrb_int argc, const mrb_value 
   }
   MRB_GET_CONTEXT(mrb)->stack[argc+1] = mrb_nil_value();
 
+#ifdef MRB_USE_GVL_API
+  if (!is_gvl_acquired) {
+    mrb_gvl_acquire(mrb);
+  }
+#endif
+
   if (MRB_PROC_CFUNC_P(p)) {
     val = p->body.func(mrb, self);
     MRB_GET_CONTEXT(mrb)->stack = MRB_GET_CONTEXT(mrb)->ci->stackent;
@@ -616,6 +660,12 @@ mrb_yield_with_class(mrb_state *mrb, mrb_value b, mrb_int argc, const mrb_value 
   else {
     val = mrb_run(mrb, p, self);
   }
+
+#ifdef MRB_USE_GVL_API
+  if (!is_gvl_acquired) {
+    mrb_gvl_release(mrb);
+  }
+#endif
   return val;
 }
 
@@ -752,6 +802,12 @@ mrb_context_run(mrb_state *mrb, struct RProc *proc, mrb_value self, unsigned int
 #endif
 
   mrb_bool exc_catched = FALSE;
+#ifdef MRB_USE_GVL_API
+  const mrb_bool is_gvl_acquired = mrb_gvl_is_acquired(mrb);
+  if (!is_gvl_acquired) {
+    mrb_gvl_acquire(mrb);
+  }
+#endif
 RETRY_TRY_BLOCK:
 
   MRB_TRY(&c_jmp) {
@@ -1570,6 +1626,11 @@ RETRY_TRY_BLOCK:
         regs = MRB_GET_CONTEXT(mrb)->stack = ci->stackent;
         if (acc == CI_ACC_SKIP) {
           MRB_GET_THREAD_CONTEXT(mrb)->jmp = prev_jmp;
+#ifdef MRB_USE_GVL_API
+          if (!is_gvl_acquired) {
+            mrb_gvl_release(mrb);
+          }
+#endif
           return v;
         }
         DEBUG(printf("from :%s\n", mrb_sym2name(mrb, ci->mid)));
@@ -2329,6 +2390,7 @@ RETRY_TRY_BLOCK:
 
     CASE(OP_STOP) {
       /*        stop VM */
+      mrb_value ret;
     L_STOP:
       {
         int eidx_stop = MRB_GET_CONTEXT(mrb)->ci == MRB_GET_CONTEXT(mrb)->cibase ? 0 : MRB_GET_CONTEXT(mrb)->ci[-1].eidx;
@@ -2340,9 +2402,21 @@ RETRY_TRY_BLOCK:
       ERR_PC_CLR(mrb);
       MRB_GET_THREAD_CONTEXT(mrb)->jmp = prev_jmp;
       if (MRB_GET_VM(mrb)->exc) {
-        return mrb_obj_value(MRB_GET_VM(mrb)->exc);
+        ret = mrb_obj_value(MRB_GET_VM(mrb)->exc);
+#ifdef MRB_USE_GVL_API
+        if (!is_gvl_acquired) {
+          mrb_gvl_release(mrb);
+        }
+#endif
+        return ret;
       }
-      return regs[irep->nlocals];
+      ret = regs[irep->nlocals];
+#ifdef MRB_USE_GVL_API
+      if (!is_gvl_acquired) {
+        mrb_gvl_release(mrb);
+      }
+#endif
+      return ret;
     }
 
     CASE(OP_ERR) {
@@ -2361,7 +2435,6 @@ RETRY_TRY_BLOCK:
     }
   }
   END_DISPATCH;
-
   }
   MRB_CATCH(&c_jmp) {
     exc_catched = TRUE;

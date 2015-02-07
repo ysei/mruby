@@ -11,6 +11,7 @@
 #include "mruby/variable.h"
 #include "mruby/debug.h"
 #include "mruby/string.h"
+#include "mruby/gvl.h"
 
 void mrb_init_heap(mrb_state*);
 void mrb_init_core(mrb_state*);
@@ -63,6 +64,10 @@ mrb_open_core(mrb_allocf f, void *ud)
   MRB_GET_THREAD_CONTEXT(mrb) = mrb_alloc_thread_context(mrb);
 
   mrb_init_heap(mrb);
+
+#ifdef MRB_USE_GVL_API
+  mrb_gvl_init(mrb);
+#endif
 
   mrb_init_core(mrb);
 
@@ -265,6 +270,9 @@ mrb_close(mrb_state *mrb)
   mrb_free_context(mrb, MRB_GET_ROOT_CONTEXT(mrb));
   mrb_free_symtbl(mrb);
   mrb_free_heap(mrb);
+#ifdef MRB_USE_GVL_API
+  mrb_gvl_cleanup(mrb);
+#endif
   mrb_alloca_free(mrb);
 #ifndef MRB_GC_FIXED_ARENA
   mrb_free(mrb, MRB_GET_THREAD_CONTEXT(mrb)->arena);
