@@ -611,13 +611,20 @@ MRB_API mrb_value
 mrb_yield_with_class(mrb_state *mrb, mrb_value b, mrb_int argc, const mrb_value *argv, mrb_value self, struct RClass *c)
 {
   struct RProc *p;
-  mrb_sym mid = MRB_GET_CONTEXT(mrb)->ci->mid;
+  mrb_sym mid;
   mrb_callinfo *ci;
-  int n = MRB_GET_CONTEXT(mrb)->ci->nregs;
+  int n;
   mrb_value val;
 #ifdef MRB_USE_GVL_API
   const mrb_bool is_gvl_acquired = mrb_gvl_is_acquired(mrb);
 #endif
+
+  if (!MRB_GET_CONTEXT(mrb)->stack) {
+    stack_init(mrb);
+  }
+
+  mid = MRB_GET_CONTEXT(mrb)->ci->mid;
+  n = MRB_GET_CONTEXT(mrb)->ci->nregs;
 
   if (mrb_nil_p(b)) {
     mrb_raise(mrb, E_ARGUMENT_ERROR, "no block given");
