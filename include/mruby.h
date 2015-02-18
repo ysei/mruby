@@ -108,15 +108,10 @@ struct mrb_jmpbuf;
 
 typedef void (*mrb_atexit_func)(struct mrb_state*);
 
-typedef struct mrb_state {
-  struct mrb_jmpbuf *jmp;
-
-  mrb_allocf allocf;                      /* memory allocation function */
-  void *allocf_ud;                        /* auxiliary data of allocf */
-
-  struct mrb_context *c;
-  struct mrb_context *root_c;
-
+/*
+ * Structure to hold VM dependent objects/informations.
+ */
+typedef struct mrb_vm_context {
   struct RObject *exc;                    /* exception */
   struct iv_tbl *globals;                 /* global variable table */
 
@@ -141,13 +136,6 @@ typedef struct mrb_state {
   struct heap_page *sweeps;
   struct heap_page *free_heaps;
   size_t live; /* count of live objects */
-#ifdef MRB_GC_FIXED_ARENA
-  struct RBasic *arena[MRB_GC_ARENA_SIZE]; /* GC protection array */
-#else
-  struct RBasic **arena;                   /* GC protection array */
-  int arena_capa;
-#endif
-  int arena_idx;
 
   enum gc_state gc_state; /* state of gc */
   int current_white_part; /* make white object by white_part */
@@ -186,7 +174,40 @@ typedef struct mrb_state {
   mrb_atexit_func *atexit_stack;
 #endif
   mrb_int atexit_stack_len;
+} mrb_vm_context;
+
+/*
+ * Structure to hold thread dependent objects/informations.
+ */
+typedef struct mrb_thread_context {
+  struct mrb_jmpbuf *jmp;
+
+  struct mrb_context *c;
+  struct mrb_context *root_c;
+
+#ifdef MRB_GC_FIXED_ARENA
+  struct RBasic *arena[MRB_GC_ARENA_SIZE]; /* GC protection array */
+#else
+  struct RBasic **arena;                   /* GC protection array */
+  int arena_capa;
+#endif
+  int arena_idx;
+} mrb_thread_context;
+
+/*
+ * Structure for Ruby RiteVM
+ */
+typedef struct mrb_state {
+  mrb_allocf allocf;                      /* memory allocation function */
+  void *allocf_ud;                        /* auxiliary data of allocf */
+  mrb_vm_context     *vm;     /* */
+  mrb_thread_context *thread; /* */
 } mrb_state;
+
+#define MRB_GET_VM(mrb)             ((mrb)->vm)
+#define MRB_GET_THREAD_CONTEXT(mrb) ((mrb)->thread)
+#define MRB_GET_CONTEXT(mrb)        ((mrb)->thread->c)
+#define MRB_GET_ROOT_CONTEXT(mrb)   ((mrb)->thread->root_c)
 
 #if __STDC_VERSION__ >= 201112L
 # define mrb_noreturn _Noreturn

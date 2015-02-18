@@ -122,7 +122,7 @@ mrb_struct_getmember(mrb_state *mrb, mrb_value obj, mrb_sym id)
 static mrb_value
 mrb_struct_ref(mrb_state *mrb, mrb_value obj)
 {
-  return mrb_struct_getmember(mrb, obj, mrb->c->ci->mid);
+  return mrb_struct_getmember(mrb, obj, MRB_GET_CONTEXT(mrb)->ci->mid);
 }
 
 static mrb_value mrb_struct_ref0(mrb_state* mrb, mrb_value obj) {return RSTRUCT_PTR(obj)[0];}
@@ -181,7 +181,7 @@ mrb_struct_set(mrb_state *mrb, mrb_value obj, mrb_value val)
   const mrb_value *ptr_members;
 
   /* get base id */
-  name = mrb_sym2name_len(mrb, mrb->c->ci->mid, &slen);
+  name = mrb_sym2name_len(mrb, MRB_GET_CONTEXT(mrb)->ci->mid, &slen);
   mid = mrb_intern(mrb, name, slen-1); /* omit last "=" */
 
   members = mrb_struct_members(mrb, obj);
@@ -835,7 +835,7 @@ void
 mrb_mruby_struct_gem_init(mrb_state* mrb)
 {
   struct RClass *st;
-  st = mrb_define_class(mrb, "Struct",  mrb->object_class);
+  st = mrb_define_class(mrb, "Struct",  MRB_GET_VM(mrb)->object_class);
 
   mrb_define_class_method(mrb, st, "new",             mrb_struct_s_def,       MRB_ARGS_ANY());  /* 15.2.18.3.1  */
 

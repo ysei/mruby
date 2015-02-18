@@ -90,13 +90,13 @@ mrb_obj_instance_exec(mrb_state *mrb, mrb_value self)
 void
 mrb_mruby_object_ext_gem_init(mrb_state* mrb)
 {
-  struct RClass * n = mrb->nil_class;
+  struct RClass * n = MRB_GET_VM(mrb)->nil_class;
 
   mrb_define_method(mrb, n, "to_a", nil_to_a,       MRB_ARGS_NONE());
   mrb_define_method(mrb, n, "to_f", nil_to_f,       MRB_ARGS_NONE());
   mrb_define_method(mrb, n, "to_i", nil_to_i,       MRB_ARGS_NONE());
 
-  mrb_define_method(mrb, mrb->object_class, "instance_exec", mrb_obj_instance_exec, MRB_ARGS_ANY() | MRB_ARGS_BLOCK());
+  mrb_define_method(mrb, MRB_GET_VM(mrb)->object_class, "instance_exec", mrb_obj_instance_exec, MRB_ARGS_ANY() | MRB_ARGS_BLOCK());
 }
 
 void

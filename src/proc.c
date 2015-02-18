@@ -17,9 +17,9 @@ struct RProc *
 mrb_proc_new(mrb_state *mrb, mrb_irep *irep)
 {
   struct RProc *p;
-  mrb_callinfo *ci = mrb->c->ci;
+  mrb_callinfo *ci = MRB_GET_CONTEXT(mrb)->ci;
 
-  p = (struct RProc*)mrb_obj_alloc(mrb, MRB_TT_PROC, mrb->proc_class);
+  p = (struct RProc*)mrb_obj_alloc(mrb, MRB_TT_PROC, MRB_GET_VM(mrb)->proc_class);
   p->target_class = 0;
   if (ci) {
     if (ci->proc)
@@ -39,11 +39,11 @@ env_new(mrb_state *mrb, int nlocals)
 {
   struct REnv *e;
 
-  e = (struct REnv*)mrb_obj_alloc(mrb, MRB_TT_ENV, (struct RClass*)mrb->c->ci->proc->env);
+  e = (struct REnv*)mrb_obj_alloc(mrb, MRB_TT_ENV, (struct RClass*)MRB_GET_CONTEXT(mrb)->ci->proc->env);
   MRB_SET_ENV_STACK_LEN(e, nlocals);
-  e->mid = mrb->c->ci->mid;
-  e->cioff = mrb->c->ci - mrb->c->cibase;
-  e->stack = mrb->c->stack;
+  e->mid = MRB_GET_CONTEXT(mrb)->ci->mid;
+  e->cioff = MRB_GET_CONTEXT(mrb)->ci - MRB_GET_CONTEXT(mrb)->cibase;
+  e->stack = MRB_GET_CONTEXT(mrb)->stack;
 
   return e;
 }
@@ -53,12 +53,12 @@ closure_setup(mrb_state *mrb, struct RProc *p, int nlocals)
 {
   struct REnv *e;
 
-  if (!mrb->c->ci->env) {
+  if (!MRB_GET_CONTEXT(mrb)->ci->env) {
     e = env_new(mrb, nlocals);
-    mrb->c->ci->env = e;
+    MRB_GET_CONTEXT(mrb)->ci->env = e;
   }
   else {
-    e = mrb->c->ci->env;
+    e = MRB_GET_CONTEXT(mrb)->ci->env;
   }
   p->env = e;
 }
@@ -68,7 +68,7 @@ mrb_closure_new(mrb_state *mrb, mrb_irep *irep)
 {
   struct RProc *p = mrb_proc_new(mrb, irep);
 
-  closure_setup(mrb, p, mrb->c->ci->proc->body.irep->nlocals);
+  closure_setup(mrb, p, MRB_GET_CONTEXT(mrb)->ci->proc->body.irep->nlocals);
   return p;
 }
 
@@ -77,7 +77,7 @@ mrb_proc_new_cfunc(mrb_state *mrb, mrb_func_t func)
 {
   struct RProc *p;
 
-  p = (struct RProc*)mrb_obj_alloc(mrb, MRB_TT_PROC, mrb->proc_class);
+  p = (struct RProc*)mrb_obj_alloc(mrb, MRB_TT_PROC, MRB_GET_VM(mrb)->proc_class);
   p->body.func = func;
   p->flags |= MRB_PROC_CFUNC;
   p->env = 0;
@@ -117,7 +117,7 @@ mrb_closure_new_cfunc(mrb_state *mrb, mrb_func_t func, int nlocals)
 MRB_API mrb_value
 mrb_proc_cfunc_env_get(mrb_state *mrb, mrb_int idx)
 {
-  struct RProc *p = mrb->c->ci->proc;
+  struct RProc *p = MRB_GET_CONTEXT(mrb)->ci->proc;
   struct REnv *e = p->env;
 
   if (!MRB_PROC_CFUNC_P(p)) {
@@ -262,14 +262,14 @@ mrb_init_proc(mrb_state *mrb)
   call_irep->iseq = call_iseq;
   call_irep->ilen = 1;
 
-  mrb_define_method(mrb, mrb->proc_class, "initialize", mrb_proc_initialize, MRB_ARGS_NONE());
-  mrb_define_method(mrb, mrb->proc_class, "initialize_copy", mrb_proc_init_copy, MRB_ARGS_REQ(1));
-  mrb_define_method(mrb, mrb->proc_class, "arity", mrb_proc_arity, MRB_ARGS_NONE());
+  mrb_define_method(mrb, MRB_GET_VM(mrb)->proc_class, "initialize", mrb_proc_initialize, MRB_ARGS_NONE());
+  mrb_define_method(mrb, MRB_GET_VM(mrb)->proc_class, "initialize_copy", mrb_proc_init_copy, MRB_ARGS_REQ(1));
+  mrb_define_method(mrb, MRB_GET_VM(mrb)->proc_class, "arity", mrb_proc_arity, MRB_ARGS_NONE());
 
   m = mrb_proc_new(mrb, call_irep);
-  mrb_define_method_raw(mrb, mrb->proc_class, mrb_intern_lit(mrb, "call"), m);
-  mrb_define_method_raw(mrb, mrb->proc_class, mrb_intern_lit(mrb, "[]"), m);
+  mrb_define_method_raw(mrb, MRB_GET_VM(mrb)->proc_class, mrb_intern_lit(mrb, "call"), m);
+  mrb_define_method_raw(mrb, MRB_GET_VM(mrb)->proc_class, mrb_intern_lit(mrb, "[]"), m);
 
-  mrb_define_class_method(mrb, mrb->kernel_module, "lambda", proc_lambda, MRB_ARGS_NONE()); /* 15.3.1.2.6  */
-  mrb_define_method(mrb, mrb->kernel_module,       "lambda", proc_lambda, MRB_ARGS_NONE()); /* 15.3.1.3.27 */
+  mrb_define_class_method(mrb, MRB_GET_VM(mrb)->kernel_module, "lambda", proc_lambda, MRB_ARGS_NONE()); /* 15.3.1.2.6  */
+  mrb_define_method(mrb, MRB_GET_VM(mrb)->kernel_module,       "lambda", proc_lambda, MRB_ARGS_NONE()); /* 15.3.1.3.27 */
 }

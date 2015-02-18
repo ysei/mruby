@@ -31,7 +31,7 @@ mrb_init_mrbtest(mrb_state *mrb)
   mrbgemtest_init(mrb);
 #endif
 
-  if (mrb->exc) {
+  if (MRB_GET_VM(mrb)->exc) {
     mrb_print_error(mrb);
     exit(EXIT_FAILURE);
   }

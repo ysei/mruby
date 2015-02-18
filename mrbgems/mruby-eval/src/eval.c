@@ -8,11 +8,11 @@
 static struct mrb_irep *
 get_closure_irep(mrb_state *mrb, int level)
 {
-  struct REnv *e = mrb->c->ci[-1].proc->env;
+  struct REnv *e = MRB_GET_CONTEXT(mrb)->ci[-1].proc->env;
   struct RProc *proc;
 
   if (level == 0) {
-    proc = mrb->c->ci[-1].proc;
+    proc = MRB_GET_CONTEXT(mrb)->ci[-1].proc;
     if (MRB_PROC_CFUNC_P(proc)) {
       return NULL;
     }
@@ -25,7 +25,7 @@ get_closure_irep(mrb_state *mrb, int level)
   }
 
   if (!e) return NULL;
-  proc = mrb->c->cibase[e->cioff].proc;
+  proc = MRB_GET_CONTEXT(mrb)->cibase[e->cioff].proc;
 
   if (MRB_PROC_CFUNC_P(proc)) {
     return NULL;
@@ -155,14 +155,14 @@ create_proc_from_string(mrb_state *mrb, char *s, int len, mrb_value binding, cha
     mrbc_context_free(mrb, cxt);
     mrb_raise(mrb, E_SCRIPT_ERROR, "codegen error");
   }
-  if (mrb->c->ci[-1].proc->target_class) {
-    proc->target_class = mrb->c->ci[-1].proc->target_class;
+  if (MRB_GET_CONTEXT(mrb)->ci[-1].proc->target_class) {
+    proc->target_class = MRB_GET_CONTEXT(mrb)->ci[-1].proc->target_class;
   }
-  e = (struct REnv*)mrb_obj_alloc(mrb, MRB_TT_ENV, (struct RClass*)mrb->c->ci[-1].proc->env);
-  e->mid = mrb->c->ci[-1].mid;
-  e->cioff = mrb->c->ci - mrb->c->cibase - 1;
-  e->stack = mrb->c->ci->stackent;
-  mrb->c->ci->env = e;
+  e = (struct REnv*)mrb_obj_alloc(mrb, MRB_TT_ENV, (struct RClass*)MRB_GET_CONTEXT(mrb)->ci[-1].proc->env);
+  e->mid = MRB_GET_CONTEXT(mrb)->ci[-1].mid;
+  e->cioff = MRB_GET_CONTEXT(mrb)->ci - MRB_GET_CONTEXT(mrb)->cibase - 1;
+  e->stack = MRB_GET_CONTEXT(mrb)->ci->stackent;
+  MRB_GET_CONTEXT(mrb)->ci->env = e;
   proc->env = e;
   patch_irep(mrb, proc->body.irep, 0);
 
@@ -187,8 +187,8 @@ f_eval(mrb_state *mrb, mrb_value self)
 
   proc = create_proc_from_string(mrb, s, len, binding, file, line);
   ret = mrb_toplevel_run(mrb, proc);
-  if (mrb->exc) {
-    mrb_exc_raise(mrb, mrb_obj_value(mrb->exc));
+  if (MRB_GET_VM(mrb)->exc) {
+    mrb_exc_raise(mrb, mrb_obj_value(MRB_GET_VM(mrb)->exc));
   }
 
   return ret;
@@ -213,9 +213,9 @@ f_instance_eval(mrb_state *mrb, mrb_value self)
     mrb_int line = 1;
 
     mrb_get_args(mrb, "s|zi", &s, &len, &file, &line);
-    mrb->c->ci->acc = CI_ACC_SKIP;
-    if (mrb->c->ci->target_class->tt == MRB_TT_ICLASS) {
-      mrb->c->ci->target_class = mrb->c->ci->target_class->c;
+    MRB_GET_CONTEXT(mrb)->ci->acc = CI_ACC_SKIP;
+    if (MRB_GET_CONTEXT(mrb)->ci->target_class->tt == MRB_TT_ICLASS) {
+      MRB_GET_CONTEXT(mrb)->ci->target_class = MRB_GET_CONTEXT(mrb)->ci->target_class->c;
     }
     return mrb_run(mrb, create_proc_from_string(mrb, s, len, mrb_nil_value(), file, line), self);
   }
@@ -228,8 +228,8 @@ f_instance_eval(mrb_state *mrb, mrb_value self)
 void
 mrb_mruby_eval_gem_init(mrb_state* mrb)
 {
-  mrb_define_module_function(mrb, mrb->kernel_module, "eval", f_eval, MRB_ARGS_ARG(1, 3));
-  mrb_define_method(mrb, mrb->kernel_module, "instance_eval", f_instance_eval, MRB_ARGS_ARG(1, 2));
+  mrb_define_module_function(mrb, MRB_GET_VM(mrb)->kernel_module, "eval", f_eval, MRB_ARGS_ARG(1, 3));
+  mrb_define_method(mrb, MRB_GET_VM(mrb)->kernel_module, "instance_eval", f_instance_eval, MRB_ARGS_ARG(1, 2));
 }
 
 void

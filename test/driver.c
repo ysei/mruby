@@ -47,9 +47,9 @@ eval_test(mrb_state *mrb)
   /* evaluate the test */
   mrb_load_string(mrb, prog);
   /* did an exception occur? */
-  if (mrb->exc) {
+  if (MRB_GET_VM(mrb)->exc) {
     mrb_print_error(mrb);
-    mrb->exc = 0;
+    MRB_GET_VM(mrb)->exc = 0;
     return EXIT_FAILURE;
   }
   else if (!check_error(mrb)) {
@@ -87,7 +87,7 @@ mrb_init_test_driver(mrb_state *mrb, mrb_bool verbose)
 {
   struct RClass *krn, *mrbtest;
 
-  krn = mrb->kernel_module;
+  krn = MRB_GET_VM(mrb)->kernel_module;
   mrb_define_method(mrb, krn, "__t_printstr__", mrb_t_printstr, MRB_ARGS_REQ(1));
 
   mrbtest = mrb_define_module(mrb, "Mrbtest");
@@ -106,7 +106,7 @@ mrb_t_pass_result(mrb_state *mrb_dst, mrb_state *mrb_src)
 {
   mrb_value res_src;
 
-  if (mrb_src->exc) {
+  if (MRB_GET_VM(mrb_src)->exc) {
     mrb_print_error(mrb_src);
     exit(EXIT_FAILURE);
   }

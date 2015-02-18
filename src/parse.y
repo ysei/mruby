@@ -5548,7 +5548,7 @@ mrb_parse_string(mrb_state *mrb, const char *s, mrbc_context *c)
 static mrb_value
 load_exec(mrb_state *mrb, parser_state *p, mrbc_context *c)
 {
-  struct RClass *target = mrb->object_class;
+  struct RClass *target = MRB_GET_VM(mrb)->object_class;
   struct RProc *proc;
   mrb_value v;
   unsigned int keep = 0;
@@ -5563,12 +5563,12 @@ load_exec(mrb_state *mrb, parser_state *p, mrbc_context *c)
 
       n = snprintf(buf, sizeof(buf), "line %d: %s\n",
           p->error_buffer[0].lineno, p->error_buffer[0].message);
-      mrb->exc = mrb_obj_ptr(mrb_exc_new(mrb, E_SYNTAX_ERROR, buf, n));
+      MRB_GET_VM(mrb)->exc = mrb_obj_ptr(mrb_exc_new(mrb, E_SYNTAX_ERROR, buf, n));
       mrb_parser_free(p);
       return mrb_undef_value();
     }
     else {
-      mrb->exc = mrb_obj_ptr(mrb_exc_new_str_lit(mrb, E_SYNTAX_ERROR, "syntax error"));
+      MRB_GET_VM(mrb)->exc = mrb_obj_ptr(mrb_exc_new_str_lit(mrb, E_SYNTAX_ERROR, "syntax error"));
       mrb_parser_free(p);
       return mrb_undef_value();
     }
@@ -5576,7 +5576,7 @@ load_exec(mrb_state *mrb, parser_state *p, mrbc_context *c)
   proc = mrb_generate_code(mrb, p);
   mrb_parser_free(p);
   if (proc == NULL) {
-    mrb->exc = mrb_obj_ptr(mrb_exc_new_str_lit(mrb, E_SCRIPT_ERROR, "codegen error"));
+    MRB_GET_VM(mrb)->exc = mrb_obj_ptr(mrb_exc_new_str_lit(mrb, E_SCRIPT_ERROR, "codegen error"));
     return mrb_undef_value();
   }
   if (c) {
@@ -5593,11 +5593,11 @@ load_exec(mrb_state *mrb, parser_state *p, mrbc_context *c)
     }
   }
   proc->target_class = target;
-  if (mrb->c->ci) {
-    mrb->c->ci->target_class = target;
+  if (MRB_GET_CONTEXT(mrb)->ci) {
+    MRB_GET_CONTEXT(mrb)->ci->target_class = target;
   }
   v = mrb_toplevel_run_keep(mrb, proc, keep);
-  if (mrb->exc) return mrb_nil_value();
+  if (MRB_GET_VM(mrb)->exc) return mrb_nil_value();
   return v;
 }
 

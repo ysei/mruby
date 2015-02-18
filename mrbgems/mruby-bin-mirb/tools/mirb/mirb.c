@@ -76,11 +76,11 @@ p(mrb_state *mrb, mrb_value obj, int prompt)
 {
   obj = mrb_funcall(mrb, obj, "inspect", 0);
   if (prompt) {
-    if (!mrb->exc) {
+    if (!MRB_GET_VM(mrb)->exc) {
       fputs(" => ", stdout);
     }
     else {
-      obj = mrb_funcall(mrb, mrb_obj_value(mrb->exc), "inspect", 0);
+      obj = mrb_funcall(mrb, mrb_obj_value(MRB_GET_VM(mrb)->exc), "inspect", 0);
     }
   }
   fwrite(RSTRING_PTR(obj), RSTRING_LEN(obj), 1, stdout);
@@ -452,9 +452,9 @@ main(int argc, char **argv)
             stack_keep);
         stack_keep = proc->body.irep->nlocals;
         /* did an exception occur? */
-        if (mrb->exc) {
-          p(mrb, mrb_obj_value(mrb->exc), 0);
-          mrb->exc = 0;
+        if (MRB_GET_VM(mrb)->exc) {
+          p(mrb, mrb_obj_value(MRB_GET_VM(mrb)->exc), 0);
+          MRB_GET_VM(mrb)->exc = 0;
         }
         else {
           /* no */

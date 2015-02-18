@@ -723,7 +723,7 @@ mrb_mruby_math_gem_init(mrb_state* mrb)
   struct RClass *mrb_math;
   mrb_math = mrb_define_module(mrb, "Math");
 
-  mrb_define_class_under(mrb, mrb_math, "DomainError", mrb->eStandardError_class);
+  mrb_define_class_under(mrb, mrb_math, "DomainError", MRB_GET_VM(mrb)->eStandardError_class);
 
 #ifdef M_PI
   mrb_define_const(mrb, mrb_math, "PI", mrb_float_value(mrb, M_PI));

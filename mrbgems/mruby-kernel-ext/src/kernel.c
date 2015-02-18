@@ -15,7 +15,7 @@
 static mrb_value
 mrb_f_method(mrb_state *mrb, mrb_value self)
 {
-  mrb_callinfo *ci = mrb->c->ci;
+  mrb_callinfo *ci = MRB_GET_CONTEXT(mrb)->ci;
   ci--;
   if (ci->mid)
     return mrb_symbol_value(ci->mid);
@@ -166,7 +166,7 @@ mrb_f_hash(mrb_state *mrb, mrb_value self)
 void
 mrb_mruby_kernel_ext_gem_init(mrb_state *mrb)
 {
-  struct RClass *krn = mrb->kernel_module;
+  struct RClass *krn = MRB_GET_VM(mrb)->kernel_module;
 
   mrb_define_module_function(mrb, krn, "fail", mrb_f_raise, MRB_ARGS_OPT(2));
   mrb_define_method(mrb, krn, "__method__", mrb_f_method, MRB_ARGS_NONE());

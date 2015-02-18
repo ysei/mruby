@@ -264,7 +264,7 @@ mrb_init_object(mrb_state *mrb)
   struct RClass *t;
   struct RClass *f;
 
-  n = mrb->nil_class   = mrb_define_class(mrb, "NilClass",   mrb->object_class);
+  n = MRB_GET_VM(mrb)->nil_class   = mrb_define_class(mrb, "NilClass",   MRB_GET_VM(mrb)->object_class);
   mrb_undef_class_method(mrb, n, "new");
   mrb_define_method(mrb, n, "&",    false_and,      MRB_ARGS_REQ(1));  /* 15.2.4.3.1  */
   mrb_define_method(mrb, n, "^",    false_xor,      MRB_ARGS_REQ(1));  /* 15.2.4.3.2  */
@@ -273,7 +273,7 @@ mrb_init_object(mrb_state *mrb)
   mrb_define_method(mrb, n, "to_s", nil_to_s,       MRB_ARGS_NONE());  /* 15.2.4.3.5  */
   mrb_define_method(mrb, n, "inspect", nil_inspect, MRB_ARGS_NONE());
 
-  t = mrb->true_class  = mrb_define_class(mrb, "TrueClass",  mrb->object_class);
+  t = MRB_GET_VM(mrb)->true_class  = mrb_define_class(mrb, "TrueClass",  MRB_GET_VM(mrb)->object_class);
   mrb_undef_class_method(mrb, t, "new");
   mrb_define_method(mrb, t, "&",    true_and,       MRB_ARGS_REQ(1));  /* 15.2.5.3.1  */
   mrb_define_method(mrb, t, "^",    true_xor,       MRB_ARGS_REQ(1));  /* 15.2.5.3.2  */
@@ -281,7 +281,7 @@ mrb_init_object(mrb_state *mrb)
   mrb_define_method(mrb, t, "|",    true_or,        MRB_ARGS_REQ(1));  /* 15.2.5.3.4  */
   mrb_define_method(mrb, t, "inspect", true_to_s,   MRB_ARGS_NONE());
 
-  f = mrb->false_class = mrb_define_class(mrb, "FalseClass", mrb->object_class);
+  f = MRB_GET_VM(mrb)->false_class = mrb_define_class(mrb, "FalseClass", MRB_GET_VM(mrb)->object_class);
   mrb_undef_class_method(mrb, f, "new");
   mrb_define_method(mrb, f, "&",    false_and,      MRB_ARGS_REQ(1));  /* 15.2.6.3.1  */
   mrb_define_method(mrb, f, "^",    false_xor,      MRB_ARGS_REQ(1));  /* 15.2.6.3.2  */
@@ -502,7 +502,7 @@ mrb_to_integer(mrb_state *mrb, mrb_value val, const char *method)
 
   if (mrb_fixnum_p(val)) return val;
   v = convert_type(mrb, val, "Integer", method, TRUE);
-  if (!mrb_obj_is_kind_of(mrb, v, mrb->fixnum_class)) {
+  if (!mrb_obj_is_kind_of(mrb, v, MRB_GET_VM(mrb)->fixnum_class)) {
     mrb_value type = inspect_type(mrb, val);
     mrb_raisef(mrb, E_TYPE_ERROR, "can't convert %S to Integer (%S#%S gives %S)",
                type, type, mrb_str_new_cstr(mrb, method), inspect_type(mrb, v));

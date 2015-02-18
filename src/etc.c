@@ -152,7 +152,7 @@ mrb_word_boxing_float_value(mrb_state *mrb, mrb_float f)
 {
   mrb_value v;
 
-  v.value.p = mrb_obj_alloc(mrb, MRB_TT_FLOAT, mrb->float_class);
+  v.value.p = mrb_obj_alloc(mrb, MRB_TT_FLOAT, MRB_GET_VM(mrb)->float_class);
   v.value.fp->f = f;
   return v;
 }
@@ -162,7 +162,7 @@ mrb_word_boxing_float_pool(mrb_state *mrb, mrb_float f)
 {
   struct RFloat *nf = (struct RFloat *)mrb_malloc(mrb, sizeof(struct RFloat));
   nf->tt = MRB_TT_FLOAT;
-  nf->c = mrb->float_class;
+  nf->c = MRB_GET_VM(mrb)->float_class;
   nf->f = f;
   return mrb_obj_value(nf);
 }
@@ -172,7 +172,7 @@ mrb_word_boxing_cptr_value(mrb_state *mrb, void *p)
 {
   mrb_value v;
 
-  v.value.p = mrb_obj_alloc(mrb, MRB_TT_CPTR, mrb->object_class);
+  v.value.p = mrb_obj_alloc(mrb, MRB_TT_CPTR, MRB_GET_VM(mrb)->object_class);
   v.value.vp->p = p;
   return v;
 }

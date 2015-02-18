@@ -29,18 +29,18 @@ mrb_class(mrb_state *mrb, mrb_value v)
   switch (mrb_type(v)) {
   case MRB_TT_FALSE:
     if (mrb_fixnum(v))
-      return mrb->false_class;
-    return mrb->nil_class;
+      return MRB_GET_VM(mrb)->false_class;
+    return MRB_GET_VM(mrb)->nil_class;
   case MRB_TT_TRUE:
-    return mrb->true_class;
+    return MRB_GET_VM(mrb)->true_class;
   case MRB_TT_SYMBOL:
-    return mrb->symbol_class;
+    return MRB_GET_VM(mrb)->symbol_class;
   case MRB_TT_FIXNUM:
-    return mrb->fixnum_class;
+    return MRB_GET_VM(mrb)->fixnum_class;
   case MRB_TT_FLOAT:
-    return mrb->float_class;
+    return MRB_GET_VM(mrb)->float_class;
   case MRB_TT_CPTR:
-    return mrb->object_class;
+    return MRB_GET_VM(mrb)->object_class;
   case MRB_TT_ENV:
     return NULL;
   default:

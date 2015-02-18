@@ -40,7 +40,7 @@ ary_new_capa(mrb_state *mrb, mrb_int capa)
     mrb_raise(mrb, E_ARGUMENT_ERROR, "array size too big");
   }
 
-  a = (struct RArray*)mrb_obj_alloc(mrb, MRB_TT_ARRAY, mrb->array_class);
+  a = (struct RArray*)mrb_obj_alloc(mrb, MRB_TT_ARRAY, MRB_GET_VM(mrb)->array_class);
   a->ptr = (mrb_value *)mrb_malloc(mrb, blen);
   a->aux.capa = capa;
   a->len = 0;
@@ -642,7 +642,7 @@ ary_subseq(mrb_state *mrb, struct RArray *a, mrb_int beg, mrb_int len)
   struct RArray *b;
 
   ary_make_shared(mrb, a);
-  b  = (struct RArray*)mrb_obj_alloc(mrb, MRB_TT_ARRAY, mrb->array_class);
+  b  = (struct RArray*)mrb_obj_alloc(mrb, MRB_TT_ARRAY, MRB_GET_VM(mrb)->array_class);
   b->ptr = a->ptr + beg;
   b->len = len;
   b->aux.shared = a->aux.shared;
@@ -1076,7 +1076,7 @@ mrb_init_array(mrb_state *mrb)
 {
   struct RClass *a;
 
-  a = mrb->array_class = mrb_define_class(mrb, "Array", mrb->object_class);            /* 15.2.12 */
+  a = MRB_GET_VM(mrb)->array_class = mrb_define_class(mrb, "Array", MRB_GET_VM(mrb)->object_class); /* 15.2.12 */
   MRB_SET_INSTANCE_TT(a, MRB_TT_ARRAY);
 
   mrb_define_class_method(mrb, a, "[]",        mrb_ary_s_create,     MRB_ARGS_ANY());  /* 15.2.12.4.1 */

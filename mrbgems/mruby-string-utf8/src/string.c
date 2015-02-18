@@ -701,7 +701,7 @@ mrb_str_codepoints(mrb_state *mrb, mrb_value self)
 void
 mrb_mruby_string_utf8_gem_init(mrb_state* mrb)
 {
-  struct RClass * s = mrb->string_class;
+  struct RClass * s = MRB_GET_VM(mrb)->string_class;
 
   mrb_define_method(mrb, s, "size", mrb_str_size, MRB_ARGS_NONE());
   mrb_define_method(mrb, s, "length", mrb_str_size, MRB_ARGS_NONE());
@@ -719,7 +719,7 @@ mrb_mruby_string_utf8_gem_init(mrb_state* mrb)
   mrb_define_method(mrb, s, "codepoints", mrb_str_codepoints, MRB_ARGS_NONE());
   mrb_alias_method(mrb, s, mrb_intern_lit(mrb, "each_codepoint"), mrb_intern_lit(mrb, "codepoints"));
 
-  mrb_define_method(mrb, mrb->fixnum_class, "chr", mrb_fixnum_chr, MRB_ARGS_NONE());
+  mrb_define_method(mrb, MRB_GET_VM(mrb)->fixnum_class, "chr", mrb_fixnum_chr, MRB_ARGS_NONE());
 }
 
 void

@@ -40,13 +40,13 @@ mrb_debug_eval(mrb_state *mrb, mrb_debug_context *dbg, const char *expr, size_t 
   mrb_value recv;
 
   /* disable code_fetch_hook */
-  tmp = mrb->code_fetch_hook;
-  mrb->code_fetch_hook = NULL;
+  tmp = MRB_GET_VM(mrb)->code_fetch_hook;
+  MRB_GET_VM(mrb)->code_fetch_hook = NULL;
 
   mrdb_check_syntax(mrb, dbg, expr, len);
-  if (mrb->exc) {
-    v = mrb_obj_value(mrb->exc);
-    mrb->exc = 0;
+  if (MRB_GET_VM(mrb)->exc) {
+    v = mrb_obj_value(MRB_GET_VM(mrb)->exc);
+    MRB_GET_VM(mrb)->exc = 0;
   }
   else {
     /*
@@ -66,13 +66,13 @@ mrb_debug_eval(mrb_state *mrb, mrb_debug_context *dbg, const char *expr, size_t 
   }
 
   if (exc) {
-    *exc = mrb_obj_is_kind_of(mrb, v, mrb->eException_class);
+    *exc = mrb_obj_is_kind_of(mrb, v, MRB_GET_VM(mrb)->eException_class);
   }
 
   s = mrb_funcall(mrb, v, "inspect", 0);
 
   /* enable code_fetch_hook */
-  mrb->code_fetch_hook = tmp;
+  MRB_GET_VM(mrb)->code_fetch_hook = tmp;
 
   return s;
 }

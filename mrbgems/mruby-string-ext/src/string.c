@@ -334,7 +334,7 @@ mrb_str_succ(mrb_state *mrb, mrb_value self)
 void
 mrb_mruby_string_ext_gem_init(mrb_state* mrb)
 {
-  struct RClass * s = mrb->string_class;
+  struct RClass * s = MRB_GET_VM(mrb)->string_class;
 
   mrb_define_method(mrb, s, "dump",            mrb_str_dump,            MRB_ARGS_NONE());
   mrb_define_method(mrb, s, "getbyte",         mrb_str_getbyte,         MRB_ARGS_REQ(1));

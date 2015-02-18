@@ -32,7 +32,7 @@ void
 mrb_mruby_print_gem_init(mrb_state* mrb)
 {
   struct RClass *krn;
-  krn = mrb->kernel_module;
+  krn = MRB_GET_VM(mrb)->kernel_module;
   mrb_define_method(mrb, krn, "__printstr__", mrb_printstr, MRB_ARGS_REQ(1));
 }
 

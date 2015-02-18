@@ -25,28 +25,42 @@ inspect_main(mrb_state *mrb, mrb_value mod)
 MRB_API mrb_state*
 mrb_open_core(mrb_allocf f, void *ud)
 {
-  static const mrb_state mrb_state_zero = { 0 };
+  static const mrb_vm_context mrb_vm_context_zero = { 0 };
+  static const mrb_thread_context mrb_thread_context_zero = { 0 };
   static const struct mrb_context mrb_context_zero = { 0 };
   mrb_state *mrb;
 
   mrb = (mrb_state *)(f)(NULL, NULL, sizeof(mrb_state), ud);
   if (mrb == NULL) return NULL;
 
-  *mrb = mrb_state_zero;
   mrb->allocf_ud = ud;
   mrb->allocf = f;
-  mrb->current_white_part = MRB_GC_WHITE_A;
-  mrb->atexit_stack_len = 0;
+
+  MRB_GET_VM(mrb) = (mrb_vm_context *)(f)(NULL, NULL, sizeof(mrb_vm_context), ud);
+  if (MRB_GET_VM(mrb) == NULL) {
+    mrb_free(mrb, mrb);
+    return NULL;
+  }
+  MRB_GET_THREAD_CONTEXT(mrb) = (mrb_thread_context *)(f)(NULL, NULL, sizeof(mrb_thread_context), ud);
+  if (MRB_GET_THREAD_CONTEXT(mrb) == NULL) {
+    mrb_free(mrb, MRB_GET_VM(mrb));
+    mrb_free(mrb, mrb);
+    return NULL;
+  }
+  *MRB_GET_VM(mrb) = mrb_vm_context_zero;
+  *MRB_GET_THREAD_CONTEXT(mrb) = mrb_thread_context_zero;
+  MRB_GET_VM(mrb)->current_white_part = MRB_GC_WHITE_A;
+  MRB_GET_VM(mrb)->atexit_stack_len = 0;
 
 #ifndef MRB_GC_FIXED_ARENA
-  mrb->arena = (struct RBasic**)mrb_malloc(mrb, sizeof(struct RBasic*)*MRB_GC_ARENA_SIZE);
-  mrb->arena_capa = MRB_GC_ARENA_SIZE;
+  MRB_GET_THREAD_CONTEXT(mrb)->arena = (struct RBasic**)mrb_malloc(mrb, sizeof(struct RBasic*)*MRB_GC_ARENA_SIZE);
+  MRB_GET_THREAD_CONTEXT(mrb)->arena_capa = MRB_GC_ARENA_SIZE;
 #endif
 
   mrb_init_heap(mrb);
-  mrb->c = (struct mrb_context*)mrb_malloc(mrb, sizeof(struct mrb_context));
-  *mrb->c = mrb_context_zero;
-  mrb->root_c = mrb->c;
+  MRB_GET_CONTEXT(mrb) = (struct mrb_context*)mrb_malloc(mrb, sizeof(struct mrb_context));
+  *MRB_GET_CONTEXT(mrb) = mrb_context_zero;
+  MRB_GET_ROOT_CONTEXT(mrb) = MRB_GET_CONTEXT(mrb);
 
   mrb_init_core(mrb);
 
@@ -76,8 +90,8 @@ mrb_alloca(mrb_state *mrb, size_t size)
   struct alloca_header *p;
 
   p = (struct alloca_header*) mrb_malloc(mrb, sizeof(struct alloca_header)+size);
-  p->next = mrb->mems;
-  mrb->mems = p;
+  p->next = MRB_GET_VM(mrb)->mems;
+  MRB_GET_VM(mrb)->mems = p;
   return (void*)p->buf;
 }
 
@@ -88,7 +102,7 @@ mrb_alloca_free(mrb_state *mrb)
   struct alloca_header *tmp;
 
   if (mrb == NULL) return;
-  p = mrb->mems;
+  p = MRB_GET_VM(mrb)->mems;
 
   while (p) {
     tmp = p;
@@ -180,7 +194,7 @@ mrb_str_pool(mrb_state *mrb, mrb_value str)
 
   ns = (struct RString *)mrb_malloc(mrb, sizeof(struct RString));
   ns->tt = MRB_TT_STRING;
-  ns->c = mrb->string_class;
+  ns->c = MRB_GET_VM(mrb)->string_class;
 
   if (RSTR_NOFREE_P(s)) {
     ns->flags = MRB_STR_NOFREE;
@@ -234,25 +248,27 @@ mrb_free_context(mrb_state *mrb, struct mrb_context *c)
 MRB_API void
 mrb_close(mrb_state *mrb)
 {
-  if (mrb->atexit_stack_len > 0) {
+  if (MRB_GET_VM(mrb)->atexit_stack_len > 0) {
     mrb_int i;
-    for (i = mrb->atexit_stack_len; i > 0; --i) {
-      mrb->atexit_stack[i - 1](mrb);
+    for (i = MRB_GET_VM(mrb)->atexit_stack_len; i > 0; --i) {
+      MRB_GET_VM(mrb)->atexit_stack[i - 1](mrb);
     }
 #ifndef MRB_FIXED_STATE_ATEXIT_STACK
-    mrb_free(mrb, mrb->atexit_stack);
+    mrb_free(mrb, MRB_GET_VM(mrb)->atexit_stack);
 #endif
   }
 
   /* free */
   mrb_gc_free_gv(mrb);
-  mrb_free_context(mrb, mrb->root_c);
+  mrb_free_context(mrb, MRB_GET_ROOT_CONTEXT(mrb));
   mrb_free_symtbl(mrb);
   mrb_free_heap(mrb);
   mrb_alloca_free(mrb);
 #ifndef MRB_GC_FIXED_ARENA
-  mrb_free(mrb, mrb->arena);
+  mrb_free(mrb, MRB_GET_THREAD_CONTEXT(mrb)->arena);
 #endif
+  mrb_free(mrb, MRB_GET_THREAD_CONTEXT(mrb));
+  mrb_free(mrb, MRB_GET_VM(mrb));
   mrb_free(mrb, mrb);
 }
 
@@ -272,31 +288,31 @@ mrb_add_irep(mrb_state *mrb)
 MRB_API mrb_value
 mrb_top_self(mrb_state *mrb)
 {
-  if (!mrb->top_self) {
-    mrb->top_self = (struct RObject*)mrb_obj_alloc(mrb, MRB_TT_OBJECT, mrb->object_class);
-    mrb_define_singleton_method(mrb, mrb->top_self, "inspect", inspect_main, MRB_ARGS_NONE());
-    mrb_define_singleton_method(mrb, mrb->top_self, "to_s", inspect_main, MRB_ARGS_NONE());
+  if (!MRB_GET_VM(mrb)->top_self) {
+    MRB_GET_VM(mrb)->top_self = (struct RObject*)mrb_obj_alloc(mrb, MRB_TT_OBJECT, MRB_GET_VM(mrb)->object_class);
+    mrb_define_singleton_method(mrb, MRB_GET_VM(mrb)->top_self, "inspect", inspect_main, MRB_ARGS_NONE());
+    mrb_define_singleton_method(mrb, MRB_GET_VM(mrb)->top_self, "to_s", inspect_main, MRB_ARGS_NONE());
   }
-  return mrb_obj_value(mrb->top_self);
+  return mrb_obj_value(MRB_GET_VM(mrb)->top_self);
 }
 
 MRB_API void
 mrb_state_atexit(mrb_state *mrb, mrb_atexit_func f)
 {
 #ifdef MRB_FIXED_STATE_ATEXIT_STACK
-  if (mrb->atexit_stack_len + 1 > MRB_FIXED_STATE_ATEXIT_STACK_SIZE) {
+  if (MRB_GET_VM(mrb)->atexit_stack_len + 1 > MRB_FIXED_STATE_ATEXIT_STACK_SIZE) {
     mrb_raise(mrb, E_RUNTIME_ERROR, "exceeded fixed state atexit stack limit");
   }
 #else
   size_t stack_size;
 
-  stack_size = sizeof(mrb_atexit_func) * (mrb->atexit_stack_len + 1);
-  if (mrb->atexit_stack_len == 0) {
-    mrb->atexit_stack = (mrb_atexit_func*)mrb_malloc(mrb, stack_size);
+  stack_size = sizeof(mrb_atexit_func) * (MRB_GET_VM(mrb)->atexit_stack_len + 1);
+  if (MRB_GET_VM(mrb)->atexit_stack_len == 0) {
+    MRB_GET_VM(mrb)->atexit_stack = (mrb_atexit_func*)mrb_malloc(mrb, stack_size);
   } else {
-    mrb->atexit_stack = (mrb_atexit_func*)mrb_realloc(mrb, mrb->atexit_stack, stack_size);
+    MRB_GET_VM(mrb)->atexit_stack = (mrb_atexit_func*)mrb_realloc(mrb, MRB_GET_VM(mrb)->atexit_stack, stack_size);
   }
 #endif
 
-  mrb->atexit_stack[mrb->atexit_stack_len++] = f;
+  MRB_GET_VM(mrb)->atexit_stack[MRB_GET_VM(mrb)->atexit_stack_len++] = f;
 }

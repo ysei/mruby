@@ -523,8 +523,8 @@ check_method_breakpoint(mrb_state *mrb, mrb_irep *irep, mrb_code *pc, mrb_value 
       sym = irep->syms[GETARG_B(*pc)];
       break;
     case OP_SUPER:
-      c = mrb->c->ci->target_class->super;
-      sym = mrb->c->ci->mid;
+      c = MRB_GET_CONTEXT(mrb)->ci->target_class->super;
+      sym = MRB_GET_CONTEXT(mrb)->ci->mid;
       break;
     default:
       sym = 0;
@@ -680,7 +680,7 @@ main(int argc, char **argv)
   mrdb->dbg->ccnt = 1;
   
   /* setup hook functions */
-  mrb->code_fetch_hook = mrb_code_fetch_hook;
+  MRB_GET_VM(mrb)->code_fetch_hook = mrb_code_fetch_hook;
   mrdb->dbg->break_hook = mrb_debug_break_hook;
 
   if (args.mrbfile) { /* .mrb */
@@ -692,8 +692,8 @@ main(int argc, char **argv)
     v = mrb_load_file_cxt(mrb, args.rfp, cc);
     mrbc_context_free(mrb, cc);
   }
-  if (mrdb->dbg->xm == DBG_QUIT && !mrb_undef_p(v) && mrb->exc) {
-    const char *classname = mrb_obj_classname(mrb, mrb_obj_value(mrb->exc));
+  if (mrdb->dbg->xm == DBG_QUIT && !mrb_undef_p(v) && MRB_GET_VM(mrb)->exc) {
+    const char *classname = mrb_obj_classname(mrb, mrb_obj_value(MRB_GET_VM(mrb)->exc));
     if (!strcmp(classname, "DebuggerExit")) {
       cleanup(mrb, &args);
       return 0;
@@ -717,7 +717,7 @@ main(int argc, char **argv)
   puts("mruby application exited.");
   mrdb->dbg->xphase = DBG_PHASE_AFTER_RUN;
   if (!mrb_undef_p(v)) {
-    if (mrb->exc) {
+    if (MRB_GET_VM(mrb)->exc) {
       mrb_print_error(mrb);
     }
     else {

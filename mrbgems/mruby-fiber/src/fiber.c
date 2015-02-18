@@ -109,7 +109,7 @@ fiber_init(mrb_state *mrb, mrb_value self)
 #endif
 
   /* copy receiver from a block */
-  c->stack[0] = mrb->c->stack[0];
+  c->stack[0] = MRB_GET_CONTEXT(mrb)->stack[0];
 
   /* initialize callinfo stack */
   c->cibase = (mrb_callinfo *)mrb_calloc(mrb, FIBER_CI_INIT_SIZE, sizeof(mrb_callinfo));
@@ -175,8 +175,8 @@ fiber_switch(mrb_state *mrb, mrb_value self, mrb_int len, const mrb_value *a, mr
   if (c->status == MRB_FIBER_TERMINATED) {
     mrb_raise(mrb, E_FIBER_ERROR, "resuming dead fiber");
   }
-  mrb->c->status = resume ? MRB_FIBER_RESUMING : MRB_FIBER_TRANSFERRED;
-  c->prev = resume ? mrb->c : (c->prev ? c->prev : mrb->root_c);
+  MRB_GET_CONTEXT(mrb)->status = resume ? MRB_FIBER_RESUMING : MRB_FIBER_TRANSFERRED;
+  c->prev = resume ? MRB_GET_CONTEXT(mrb) : (c->prev ? c->prev : MRB_GET_ROOT_CONTEXT(mrb));
   if (c->status == MRB_FIBER_CREATED) {
     mrb_value *b = c->stack+1;
     mrb_value *e = b + len;
@@ -189,7 +189,7 @@ fiber_switch(mrb_state *mrb, mrb_value self, mrb_int len, const mrb_value *a, mr
       mrb_field_write_barrier(mrb, (struct RBasic*)c->fib, (struct RBasic*)c->prev->fib);
     mrb_write_barrier(mrb, (struct RBasic*)c->fib);
     c->status = MRB_FIBER_RUNNING;
-    mrb->c = c;
+    MRB_GET_CONTEXT(mrb) = c;
 
     MARK_CONTEXT_MODIFY(c);
     return c->ci->proc->env->stack[0];
@@ -199,7 +199,7 @@ fiber_switch(mrb_state *mrb, mrb_value self, mrb_int len, const mrb_value *a, mr
     mrb_field_write_barrier(mrb, (struct RBasic*)c->fib, (struct RBasic*)c->prev->fib);
   mrb_write_barrier(mrb, (struct RBasic*)c->fib);
   c->status = MRB_FIBER_RUNNING;
-  mrb->c = c;
+  MRB_GET_CONTEXT(mrb) = c;
   return fiber_result(mrb, a, len);
 }
 
@@ -275,16 +275,16 @@ fiber_transfer(mrb_state *mrb, mrb_value self)
 
   mrb_get_args(mrb, "*", &a, &len);
 
-  if (c == mrb->root_c) {
-    mrb->c->status = MRB_FIBER_TRANSFERRED;
-    mrb->c = c;
+  if (c == MRB_GET_ROOT_CONTEXT(mrb)) {
+    MRB_GET_CONTEXT(mrb)->status = MRB_FIBER_TRANSFERRED;
+    MRB_GET_CONTEXT(mrb) = c;
     c->status = MRB_FIBER_RUNNING;
     MARK_CONTEXT_MODIFY(c);
     mrb_write_barrier(mrb, (struct RBasic*)c->fib);
     return fiber_result(mrb, a, len);
   }
 
-  if (c == mrb->c) {
+  if (c == MRB_GET_CONTEXT(mrb)) {
     return fiber_result(mrb, a, len);
   }
 
@@ -294,7 +294,7 @@ fiber_transfer(mrb_state *mrb, mrb_value self)
 MRB_API mrb_value
 mrb_fiber_yield(mrb_state *mrb, mrb_int len, const mrb_value *a)
 {
-  struct mrb_context *c = mrb->c;
+  struct mrb_context *c = MRB_GET_CONTEXT(mrb);
   mrb_callinfo *ci;
 
   for (ci = c->ci; ci >= c->cibase; ci--) {
@@ -308,9 +308,9 @@ mrb_fiber_yield(mrb_state *mrb, mrb_int len, const mrb_value *a)
 
   c->prev->status = MRB_FIBER_RUNNING;
   c->status = MRB_FIBER_SUSPENDED;
-  mrb->c = c->prev;
+  MRB_GET_CONTEXT(mrb) = c->prev;
   c->prev = NULL;
-  MARK_CONTEXT_MODIFY(mrb->c);
+  MARK_CONTEXT_MODIFY(MRB_GET_CONTEXT(mrb));
   mrb_write_barrier(mrb, (struct RBasic*)c->fib);
   return fiber_result(mrb, a, len);
 }
@@ -345,13 +345,13 @@ fiber_yield(mrb_state *mrb, mrb_value self)
 static mrb_value
 fiber_current(mrb_state *mrb, mrb_value self)
 {
-  if (!mrb->c->fib) {
+  if (!MRB_GET_CONTEXT(mrb)->fib) {
     struct RFiber *f = (struct RFiber*)mrb_obj_alloc(mrb, MRB_TT_FIBER, mrb_class_ptr(self));
 
-    f->cxt = mrb->c;
-    mrb->c->fib = f;
+    f->cxt = MRB_GET_CONTEXT(mrb);
+    MRB_GET_CONTEXT(mrb)->fib = f;
   }
-  return mrb_obj_value(mrb->c->fib);
+  return mrb_obj_value(MRB_GET_CONTEXT(mrb)->fib);
 }
 
 void
@@ -359,7 +359,7 @@ mrb_mruby_fiber_gem_init(mrb_state* mrb)
 {
   struct RClass *c;
 
-  c = mrb_define_class(mrb, "Fiber", mrb->object_class);
+  c = mrb_define_class(mrb, "Fiber", MRB_GET_VM(mrb)->object_class);
   MRB_SET_INSTANCE_TT(c, MRB_TT_FIBER);
 
   mrb_define_method(mrb, c, "initialize", fiber_init,    MRB_ARGS_NONE());
@@ -371,7 +371,7 @@ mrb_mruby_fiber_gem_init(mrb_state* mrb)
   mrb_define_class_method(mrb, c, "yield", fiber_yield, MRB_ARGS_ANY());
   mrb_define_class_method(mrb, c, "current", fiber_current, MRB_ARGS_NONE());
 
-  mrb_define_class(mrb, "FiberError", mrb->eStandardError_class);
+  mrb_define_class(mrb, "FiberError", MRB_GET_VM(mrb)->eStandardError_class);
 }
 
 void

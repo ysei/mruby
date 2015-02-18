@@ -26,9 +26,9 @@ static mrb_value
 mrb_sym_all_symbols(mrb_state *mrb, mrb_value self)
 {
   mrb_sym i, lim;
-  mrb_value ary = mrb_ary_new_capa(mrb, mrb->symidx);
+  mrb_value ary = mrb_ary_new_capa(mrb, MRB_GET_VM(mrb)->symidx);
 
-  for (i=1, lim=mrb->symidx+1; i<lim; i++) {
+  for (i=1, lim=MRB_GET_VM(mrb)->symidx+1; i<lim; i++) {
     mrb_ary_push(mrb, ary, mrb_symbol_value(i));
   }
 
@@ -52,7 +52,7 @@ mrb_sym_length(mrb_state *mrb, mrb_value self)
 void
 mrb_mruby_symbol_ext_gem_init(mrb_state* mrb)
 {
-  struct RClass *s = mrb->symbol_class;
+  struct RClass *s = MRB_GET_VM(mrb)->symbol_class;
   mrb_define_class_method(mrb, s, "all_symbols", mrb_sym_all_symbols, MRB_ARGS_NONE());
   mrb_define_method(mrb, s, "length", mrb_sym_length, MRB_ARGS_NONE());
   mrb_define_method(mrb, s, "size", mrb_sym_length, MRB_ARGS_NONE());

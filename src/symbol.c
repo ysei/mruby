@@ -23,15 +23,15 @@ static inline khint_t
 sym_hash_func(mrb_state *mrb, mrb_sym s)
 {
   khint_t h = 0;
-  size_t i, len = mrb->symtbl[s].len;
-  const char *p = mrb->symtbl[s].name;
+  size_t i, len = MRB_GET_VM(mrb)->symtbl[s].len;
+  const char *p = MRB_GET_VM(mrb)->symtbl[s].name;
 
   for (i=0; i<len; i++) {
     h = (h << 5) - h + *p++;
   }
   return h;
 }
-#define sym_hash_equal(mrb,a, b) (mrb->symtbl[a].len == mrb->symtbl[b].len && memcmp(mrb->symtbl[a].name, mrb->symtbl[b].name, mrb->symtbl[a].len) == 0)
+#define sym_hash_equal(mrb,a, b) (MRB_GET_VM(mrb)->symtbl[a].len == MRB_GET_VM(mrb)->symtbl[b].len && memcmp(MRB_GET_VM(mrb)->symtbl[a].name, MRB_GET_VM(mrb)->symtbl[b].name, MRB_GET_VM(mrb)->symtbl[a].len) == 0)
 
 KHASH_DECLARE(n2s, mrb_sym, mrb_sym, FALSE)
 KHASH_DEFINE (n2s, mrb_sym, mrb_sym, FALSE, sym_hash_func, sym_hash_equal)
@@ -48,8 +48,8 @@ sym_validate_len(mrb_state *mrb, size_t len)
 static mrb_sym
 sym_intern(mrb_state *mrb, const char *name, size_t len, mrb_bool lit)
 {
-  khash_t(n2s) *h = mrb->name2sym;
-  symbol_name *sname = mrb->symtbl; /* symtbl[0] for working memory */
+  khash_t(n2s) *h = MRB_GET_VM(mrb)->name2sym;
+  symbol_name *sname = MRB_GET_VM(mrb)->symtbl; /* symtbl[0] for working memory */
   khiter_t k;
   mrb_sym sym;
   char *p;
@@ -65,13 +65,13 @@ sym_intern(mrb_state *mrb, const char *name, size_t len, mrb_bool lit)
   }
 
   /* registering a new symbol */
-  sym = ++mrb->symidx;
-  if (mrb->symcapa < sym) {
-    if (mrb->symcapa == 0) mrb->symcapa = 100;
-    else mrb->symcapa = (size_t)(mrb->symcapa * 1.2);
-    mrb->symtbl = (symbol_name*)mrb_realloc(mrb, mrb->symtbl, sizeof(symbol_name)*(mrb->symcapa+1));
+  sym = ++MRB_GET_VM(mrb)->symidx;
+  if (MRB_GET_VM(mrb)->symcapa < sym) {
+    if (MRB_GET_VM(mrb)->symcapa == 0) MRB_GET_VM(mrb)->symcapa = 100;
+    else MRB_GET_VM(mrb)->symcapa = (size_t)(MRB_GET_VM(mrb)->symcapa * 1.2);
+    MRB_GET_VM(mrb)->symtbl = (symbol_name*)mrb_realloc(mrb, MRB_GET_VM(mrb)->symtbl, sizeof(symbol_name)*(MRB_GET_VM(mrb)->symcapa+1));
   }
-  sname = &mrb->symtbl[sym];
+  sname = &MRB_GET_VM(mrb)->symtbl[sym];
   sname->len = (uint16_t)len;
   if (lit || mrb_ro_data_p(name)) {
     sname->name = name;
@@ -116,8 +116,8 @@ mrb_intern_str(mrb_state *mrb, mrb_value str)
 MRB_API mrb_value
 mrb_check_intern(mrb_state *mrb, const char *name, size_t len)
 {
-  khash_t(n2s) *h = mrb->name2sym;
-  symbol_name *sname = mrb->symtbl;
+  khash_t(n2s) *h = MRB_GET_VM(mrb)->name2sym;
+  symbol_name *sname = MRB_GET_VM(mrb)->symtbl;
   khiter_t k;
 
   sym_validate_len(mrb, len);
@@ -147,13 +147,13 @@ mrb_check_intern_str(mrb_state *mrb, mrb_value str)
 MRB_API const char*
 mrb_sym2name_len(mrb_state *mrb, mrb_sym sym, mrb_int *lenp)
 {
-  if (sym == 0 || mrb->symidx < sym) {
+  if (sym == 0 || MRB_GET_VM(mrb)->symidx < sym) {
     if (lenp) *lenp = 0;
     return NULL;
   }
 
-  if (lenp) *lenp = mrb->symtbl[sym].len;
-  return mrb->symtbl[sym].name;
+  if (lenp) *lenp = MRB_GET_VM(mrb)->symtbl[sym].len;
+  return MRB_GET_VM(mrb)->symtbl[sym].name;
 }
 
 void
@@ -161,19 +161,19 @@ mrb_free_symtbl(mrb_state *mrb)
 {
   mrb_sym i, lim;
 
-  for (i=1, lim=mrb->symidx+1; i<lim; i++) {
-    if (!mrb->symtbl[i].lit) {
-      mrb_free(mrb, (char*)mrb->symtbl[i].name);
+  for (i=1, lim=MRB_GET_VM(mrb)->symidx+1; i<lim; i++) {
+    if (!MRB_GET_VM(mrb)->symtbl[i].lit) {
+      mrb_free(mrb, (char*)MRB_GET_VM(mrb)->symtbl[i].name);
     }
   }
-  mrb_free(mrb, mrb->symtbl);
-  kh_destroy(n2s, mrb, mrb->name2sym);
+  mrb_free(mrb, MRB_GET_VM(mrb)->symtbl);
+  kh_destroy(n2s, mrb, MRB_GET_VM(mrb)->name2sym);
 }
 
 void
 mrb_init_symtbl(mrb_state *mrb)
 {
-  mrb->name2sym = kh_init(n2s, mrb);
+  MRB_GET_VM(mrb)->name2sym = kh_init(n2s, mrb);
 }
 
 /**********************************************************************
@@ -479,7 +479,7 @@ mrb_init_symbol(mrb_state *mrb)
 {
   struct RClass *sym;
 
-  sym = mrb->symbol_class = mrb_define_class(mrb, "Symbol", mrb->object_class);                 /* 15.2.11 */
+  sym = MRB_GET_VM(mrb)->symbol_class = mrb_define_class(mrb, "Symbol", MRB_GET_VM(mrb)->object_class); /* 15.2.11 */
 
   mrb_define_method(mrb, sym, "===",             sym_equal,      MRB_ARGS_REQ(1));              /* 15.2.11.3.1  */
   mrb_define_method(mrb, sym, "id2name",         mrb_sym_to_s,   MRB_ARGS_NONE());              /* 15.2.11.3.2  */

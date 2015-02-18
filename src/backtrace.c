@@ -65,11 +65,11 @@ output_backtrace(mrb_state *mrb, mrb_int ciidx, mrb_code *pc0, output_stream_fun
   const char *filename, *method, *sep;
   int i, lineno, tracehead = 1;
 
-  if (ciidx >= mrb->c->ciend - mrb->c->cibase)
+  if (ciidx >= MRB_GET_CONTEXT(mrb)->ciend - MRB_GET_CONTEXT(mrb)->cibase)
     ciidx = 10; /* ciidx is broken... */
 
   for (i = ciidx; i >= 0; i--) {
-    ci = &mrb->c->cibase[i];
+    ci = &MRB_GET_CONTEXT(mrb)->cibase[i];
     filename = NULL;
 
     if (!ci->proc) continue;
@@ -80,11 +80,11 @@ output_backtrace(mrb_state *mrb, mrb_int ciidx, mrb_code *pc0, output_stream_fun
       mrb_irep *irep = ci->proc->body.irep;
       mrb_code *pc;
 
-      if (mrb->c->cibase[i].err) {
-        pc = mrb->c->cibase[i].err;
+      if (MRB_GET_CONTEXT(mrb)->cibase[i].err) {
+        pc = MRB_GET_CONTEXT(mrb)->cibase[i].err;
       }
       else if (i+1 <= ciidx) {
-        pc = mrb->c->cibase[i+1].pc - 1;
+        pc = MRB_GET_CONTEXT(mrb)->cibase[i+1].pc - 1;
       }
       else {
         pc = pc0;
@@ -147,10 +147,10 @@ exc_output_backtrace(mrb_state *mrb, struct RObject *exc, output_stream_func fun
 MRB_API void
 mrb_print_backtrace(mrb_state *mrb)
 {
-  if (!mrb->exc || mrb_obj_is_kind_of(mrb, mrb_obj_value(mrb->exc), E_SYSSTACK_ERROR)) {
+  if (!MRB_GET_VM(mrb)->exc || mrb_obj_is_kind_of(mrb, mrb_obj_value(MRB_GET_VM(mrb)->exc), E_SYSSTACK_ERROR)) {
     return;
   }
-  exc_output_backtrace(mrb, mrb->exc, print_backtrace_i, (void*)stderr);
+  exc_output_backtrace(mrb, MRB_GET_VM(mrb)->exc, print_backtrace_i, (void*)stderr);
 }
 
 MRB_API mrb_value
@@ -168,9 +168,9 @@ MRB_API mrb_value
 mrb_get_backtrace(mrb_state *mrb)
 {
   mrb_value ary;
-  mrb_callinfo *ci = mrb->c->ci;
+  mrb_callinfo *ci = MRB_GET_CONTEXT(mrb)->ci;
   mrb_code *pc = ci->pc;
-  mrb_int ciidx = (mrb_int)(ci - mrb->c->cibase - 1);
+  mrb_int ciidx = (mrb_int)(ci - MRB_GET_CONTEXT(mrb)->cibase - 1);
 
   if (ciidx < 0) ciidx = 0;
   ary = mrb_ary_new(mrb);

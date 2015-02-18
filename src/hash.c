@@ -149,7 +149,7 @@ mrb_hash_new_capa(mrb_state *mrb, int capa)
 {
   struct RHash *h;
 
-  h = (struct RHash*)mrb_obj_alloc(mrb, MRB_TT_HASH, mrb->hash_class);
+  h = (struct RHash*)mrb_obj_alloc(mrb, MRB_TT_HASH, MRB_GET_VM(mrb)->hash_class);
   h->ht = kh_init(ht, mrb);
   if (capa > 0) {
     kh_resize(ht, mrb, h->ht, capa);
@@ -234,7 +234,7 @@ mrb_hash_dup(mrb_state *mrb, mrb_value hash)
   khiter_t k, ret_k;
 
   h = RHASH_TBL(hash);
-  ret = (struct RHash*)mrb_obj_alloc(mrb, MRB_TT_HASH, mrb->hash_class);
+  ret = (struct RHash*)mrb_obj_alloc(mrb, MRB_TT_HASH, MRB_GET_VM(mrb)->hash_class);
   ret->ht = kh_init(ht, mrb);
 
   if (kh_size(h) > 0) {
@@ -826,7 +826,7 @@ mrb_init_hash(mrb_state *mrb)
 {
   struct RClass *h;
 
-  h = mrb->hash_class = mrb_define_class(mrb, "Hash", mrb->object_class);              /* 15.2.13 */
+  h = MRB_GET_VM(mrb)->hash_class = mrb_define_class(mrb, "Hash", MRB_GET_VM(mrb)->object_class);              /* 15.2.13 */
   MRB_SET_INSTANCE_TT(h, MRB_TT_HASH);
 
   mrb_define_method(mrb, h, "[]",              mrb_hash_aget,        MRB_ARGS_REQ(1)); /* 15.2.13.4.2  */

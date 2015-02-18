@@ -149,7 +149,7 @@ module MRuby
           f.puts %Q[  mrb_#{funcname}_gem_init(mrb);] if objs != [objfile("#{build_dir}/gem_init")]
           unless rbfiles.empty?
             f.puts %Q[  mrb_load_irep(mrb, gem_mrblib_irep_#{funcname});]
-            f.puts %Q[  if (mrb->exc) {]
+            f.puts %Q[  if (MRB_GET_VM(mrb)->exc) {]
             f.puts %Q[    mrb_print_error(mrb);]
             f.puts %Q[    exit(EXIT_FAILURE);]
             f.puts %Q[  }]

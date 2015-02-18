@@ -175,19 +175,19 @@ mrb_obj_id_m(mrb_state *mrb, mrb_value self)
 static mrb_value
 mrb_f_block_given_p_m(mrb_state *mrb, mrb_value self)
 {
-  mrb_callinfo *ci = mrb->c->ci;
+  mrb_callinfo *ci = MRB_GET_CONTEXT(mrb)->ci;
   mrb_value *bp;
   mrb_bool given_p;
 
   bp = ci->stackent + 1;
   ci--;
-  if (ci <= mrb->c->cibase) {
+  if (ci <= MRB_GET_CONTEXT(mrb)->cibase) {
     given_p = FALSE;
   }
   else {
     /* block_given? called within block; check upper scope */
     if (ci->proc->env && ci->proc->env->stack) {
-      given_p = !(ci->proc->env->stack == mrb->c->stbase ||
+      given_p = !(ci->proc->env->stack == MRB_GET_CONTEXT(mrb)->stbase ||
                   mrb_nil_p(ci->proc->env->stack[1]));
     }
     else {
@@ -228,7 +228,7 @@ mrb_singleton_class_clone(mrb_state *mrb, mrb_value obj)
     return klass;
   else {
     /* copy singleton(unnamed) class */
-    struct RClass *clone = (struct RClass*)mrb_obj_alloc(mrb, klass->tt, mrb->class_class);
+    struct RClass *clone = (struct RClass*)mrb_obj_alloc(mrb, klass->tt, MRB_GET_VM(mrb)->class_class);
 
     if ((mrb_type(obj) == MRB_TT_CLASS) ||
       (mrb_type(obj) == MRB_TT_SCLASS)) { /* BUILTIN_TYPE(obj) == T_CLASS */
@@ -825,7 +825,7 @@ mrb_f_raise(mrb_state *mrb, mrb_value self)
     /* fall through */
   default:
     exc = mrb_make_exception(mrb, argc, a);
-    mrb_obj_iv_set(mrb, mrb_obj_ptr(exc), mrb_intern_lit(mrb, "lastpc"), mrb_cptr_value(mrb, mrb->c->ci->pc));
+    mrb_obj_iv_set(mrb, mrb_obj_ptr(exc), mrb_intern_lit(mrb, "lastpc"), mrb_cptr_value(mrb, MRB_GET_CONTEXT(mrb)->ci->pc));
     mrb_exc_raise(mrb, exc);
     break;
   }
@@ -988,7 +988,7 @@ mod_define_singleton_method(mrb_state *mrb, mrb_value self)
   if (mrb_nil_p(blk)) {
     mrb_raise(mrb, E_ARGUMENT_ERROR, "no block given");
   }
-  p = (struct RProc*)mrb_obj_alloc(mrb, MRB_TT_PROC, mrb->proc_class);
+  p = (struct RProc*)mrb_obj_alloc(mrb, MRB_TT_PROC, MRB_GET_VM(mrb)->proc_class);
   mrb_proc_copy(p, mrb_proc_ptr(blk));
   p->flags |= MRB_PROC_STRICT;
   mrb_define_method_raw(mrb, mrb_class_ptr(mrb_singleton_class(mrb, self)), mid, p);
@@ -1020,7 +1020,7 @@ mrb_local_variables(mrb_state *mrb, mrb_value self)
   struct mrb_irep *irep;
   size_t i;
 
-  proc = mrb->c->ci[-1].proc;
+  proc = MRB_GET_CONTEXT(mrb)->ci[-1].proc;
 
   if (MRB_PROC_CFUNC_P(proc)) {
     return mrb_ary_new(mrb);
@@ -1040,8 +1040,8 @@ mrb_local_variables(mrb_state *mrb, mrb_value self)
     struct REnv *e = proc->env;
 
     while (e) {
-      if (!MRB_PROC_CFUNC_P(mrb->c->cibase[e->cioff].proc)) {
-        irep = mrb->c->cibase[e->cioff].proc->body.irep;
+      if (!MRB_PROC_CFUNC_P(MRB_GET_CONTEXT(mrb)->cibase[e->cioff].proc)) {
+        irep = MRB_GET_CONTEXT(mrb)->cibase[e->cioff].proc->body.irep;
         if (irep->lv) {
           for (i = 0; i + 1 < irep->nlocals; ++i) {
             if (irep->lv[i].name) {
@@ -1062,7 +1062,7 @@ mrb_init_kernel(mrb_state *mrb)
 {
   struct RClass *krn;
 
-  krn = mrb->kernel_module = mrb_define_module(mrb, "Kernel");                                                    /* 15.3.1 */
+  krn = MRB_GET_VM(mrb)->kernel_module = mrb_define_module(mrb, "Kernel");                                                    /* 15.3.1 */
   mrb_define_class_method(mrb, krn, "block_given?",         mrb_f_block_given_p_m,           MRB_ARGS_NONE());    /* 15.3.1.2.2  */
   mrb_define_class_method(mrb, krn, "global_variables",     mrb_f_global_variables,          MRB_ARGS_NONE());    /* 15.3.1.2.4  */
   mrb_define_class_method(mrb, krn, "iterator?",            mrb_f_block_given_p_m,           MRB_ARGS_NONE());    /* 15.3.1.2.5  */
@@ -1113,6 +1113,6 @@ mrb_init_kernel(mrb_state *mrb)
   mrb_define_method(mrb, krn, "to_s",                       mrb_any_to_s,                    MRB_ARGS_NONE());    /* 15.3.1.3.46 */
   mrb_define_method(mrb, krn, "__case_eqq",                 mrb_obj_ceqq,                    MRB_ARGS_REQ(1));    /* internal */
 
-  mrb_include_module(mrb, mrb->object_class, mrb->kernel_module);
-  mrb_alias_method(mrb, mrb->module_class, mrb_intern_lit(mrb, "dup"), mrb_intern_lit(mrb, "clone"));
+  mrb_include_module(mrb, MRB_GET_VM(mrb)->object_class, MRB_GET_VM(mrb)->kernel_module);
+  mrb_alias_method(mrb, MRB_GET_VM(mrb)->module_class, mrb_intern_lit(mrb, "dup"), mrb_intern_lit(mrb, "clone"));
 }

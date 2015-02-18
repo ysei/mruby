@@ -151,7 +151,7 @@ mrb_ary_to_h(mrb_state *mrb, mrb_value ary)
 void
 mrb_mruby_array_ext_gem_init(mrb_state* mrb)
 {
-  struct RClass * a = mrb->array_class;
+  struct RClass * a = MRB_GET_VM(mrb)->array_class;
 
   mrb_define_method(mrb, a, "assoc",  mrb_ary_assoc,  MRB_ARGS_REQ(1));
   mrb_define_method(mrb, a, "at",     mrb_ary_at,     MRB_ARGS_REQ(1));
