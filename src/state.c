@@ -22,12 +22,27 @@ inspect_main(mrb_state *mrb, mrb_value mod)
   return mrb_str_new_lit(mrb, "main");
 }
 
+static mrb_thread_context*
+mrb_alloc_thread_context(mrb_state *mrb)
+{
+  static const mrb_thread_context mrb_thread_context_zero = { 0 };
+  static const struct mrb_context mrb_context_zero = { 0 };
+  mrb_thread_context *context = (mrb_thread_context*)mrb_malloc(mrb, sizeof(mrb_thread_context));
+  *context = mrb_thread_context_zero;
+#ifndef MRB_GC_FIXED_ARENA
+  context->arena = (struct RBasic**)mrb_malloc(mrb, sizeof(struct RBasic*)*MRB_GC_ARENA_SIZE);
+  context->arena_capa = MRB_GC_ARENA_SIZE;
+#endif
+  context->c = (struct mrb_context*)mrb_malloc(mrb, sizeof(struct mrb_context));
+  *context->c = mrb_context_zero;
+  context->root_c = context->c;
+  return context;
+}
+
 MRB_API mrb_state*
 mrb_open_core(mrb_allocf f, void *ud)
 {
   static const mrb_vm_context mrb_vm_context_zero = { 0 };
-  static const mrb_thread_context mrb_thread_context_zero = { 0 };
-  static const struct mrb_context mrb_context_zero = { 0 };
   mrb_state *mrb;
 
   mrb = (mrb_state *)(f)(NULL, NULL, sizeof(mrb_state), ud);
@@ -41,26 +56,13 @@ mrb_open_core(mrb_allocf f, void *ud)
     mrb_free(mrb, mrb);
     return NULL;
   }
-  MRB_GET_THREAD_CONTEXT(mrb) = (mrb_thread_context *)(f)(NULL, NULL, sizeof(mrb_thread_context), ud);
-  if (MRB_GET_THREAD_CONTEXT(mrb) == NULL) {
-    mrb_free(mrb, MRB_GET_VM(mrb));
-    mrb_free(mrb, mrb);
-    return NULL;
-  }
   *MRB_GET_VM(mrb) = mrb_vm_context_zero;
-  *MRB_GET_THREAD_CONTEXT(mrb) = mrb_thread_context_zero;
   MRB_GET_VM(mrb)->current_white_part = MRB_GC_WHITE_A;
   MRB_GET_VM(mrb)->atexit_stack_len = 0;
 
-#ifndef MRB_GC_FIXED_ARENA
-  MRB_GET_THREAD_CONTEXT(mrb)->arena = (struct RBasic**)mrb_malloc(mrb, sizeof(struct RBasic*)*MRB_GC_ARENA_SIZE);
-  MRB_GET_THREAD_CONTEXT(mrb)->arena_capa = MRB_GC_ARENA_SIZE;
-#endif
+  MRB_GET_THREAD_CONTEXT(mrb) = mrb_alloc_thread_context(mrb);
 
   mrb_init_heap(mrb);
-  MRB_GET_CONTEXT(mrb) = (struct mrb_context*)mrb_malloc(mrb, sizeof(struct mrb_context));
-  *MRB_GET_CONTEXT(mrb) = mrb_context_zero;
-  MRB_GET_ROOT_CONTEXT(mrb) = MRB_GET_CONTEXT(mrb);
 
   mrb_init_core(mrb);
 
