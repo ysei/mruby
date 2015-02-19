@@ -62,6 +62,10 @@ mrb_open_core(mrb_allocf f, void *ud)
   MRB_GET_VM(mrb)->atexit_stack_len = 0;
 
   MRB_GET_THREAD_CONTEXT(mrb) = mrb_alloc_thread_context(mrb);
+#ifdef MRB_USE_THREAD_API
+  MRB_GET_VM(mrb)->threads[0] = MRB_GET_THREAD_CONTEXT(mrb);
+  MRB_GET_VM(mrb)->thread_count = 1;
+#endif
 
   mrb_init_heap(mrb);
 
@@ -82,6 +86,7 @@ mrb_duplicate_core(mrb_state *mrb)
   dup = (mrb_state *)mrb_malloc(mrb, sizeof(mrb_state));
   *dup = *mrb;
   MRB_GET_THREAD_CONTEXT(dup) = mrb_alloc_thread_context(mrb);
+  MRB_GET_THREAD_CONTEXT(dup)->id = ++MRB_GET_VM(mrb)->thread_index;
   return dup;
 }
 #endif

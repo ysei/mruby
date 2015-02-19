@@ -702,10 +702,6 @@ root_scan_phase(mrb_state *mrb)
   }
 
   mrb_gc_mark_gv(mrb);
-  /* mark arena */
-  for (i=0,e=MRB_GET_THREAD_CONTEXT(mrb)->arena_idx; i<e; i++) {
-    mrb_gc_mark(mrb, MRB_GET_THREAD_CONTEXT(mrb)->arena[i]);
-  }
   /* mark class hierarchy */
   mrb_gc_mark(mrb, (struct RBasic*)MRB_GET_VM(mrb)->object_class);
   /* mark top_self */
@@ -715,6 +711,12 @@ root_scan_phase(mrb_state *mrb)
   /* mark pre-allocated exception */
   mrb_gc_mark(mrb, (struct RBasic*)MRB_GET_VM(mrb)->nomem_err);
 
+#ifndef MRB_USE_THREAD_API
+  /* mark arena */
+  for (i=0,e=MRB_GET_THREAD_CONTEXT(mrb)->arena_idx; i<e; i++) {
+    mrb_gc_mark(mrb, MRB_GET_THREAD_CONTEXT(mrb)->arena[i]);
+  }
+
   mark_context(mrb, MRB_GET_ROOT_CONTEXT(mrb));
   if (MRB_GET_ROOT_CONTEXT(mrb)->fib) {
     mrb_gc_mark(mrb, (struct RBasic*)MRB_GET_ROOT_CONTEXT(mrb)->fib);
@@ -722,6 +724,33 @@ root_scan_phase(mrb_state *mrb)
   if (MRB_GET_ROOT_CONTEXT(mrb) != MRB_GET_CONTEXT(mrb)) {
     mark_context(mrb, MRB_GET_CONTEXT(mrb));
   }
+#else
+  for (i = 0; i < MRB_FIXED_THREAD_SIZE; ++i) {
+    const mrb_thread_context *context = MRB_GET_VM(mrb)->threads[i];
+    struct mrb_context *root_c;
+    struct mrb_context *c;
+    size_t j;
+
+    if (!context) {
+      continue;
+    }
+
+    root_c = context->root_c;
+    c = context->c;
+
+    /* mark arena */
+    for (j = 0, e = context->arena_idx; j < e; j++) {
+      mrb_gc_mark(mrb, context->arena[j]);
+    }
+    mark_context(mrb, root_c);
+    if (root_c->fib) {
+      mrb_gc_mark(mrb, (struct RBasic*)root_c->fib);
+    }
+    if (root_c != c) {
+      mark_context(mrb, c);
+    }
+  }
+#endif
 }
 
 static size_t

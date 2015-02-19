@@ -101,13 +101,35 @@ mrb_thread_join(mrb_state *mrb, mrb_thread_t *thread, void *result)
 MRB_API mrb_state*
 mrb_thread_attach_vm(mrb_state *mrb)
 {
-  return mrb_duplicate_core(mrb);
+  mrb_int i;
+  mrb_state *new_state = mrb_duplicate_core(mrb);
+  for (i = 0; i < MRB_FIXED_THREAD_SIZE; ++i) {
+    if (MRB_GET_VM(mrb)->threads[i] == NULL) {
+      MRB_GET_VM(mrb)->threads[i] = MRB_GET_THREAD_CONTEXT(new_state);
+      ++MRB_GET_VM(mrb)->thread_count;
+      break;
+    }
+  }
+  return new_state;
 }
 
 MRB_API void
 mrb_thread_detach_vm(mrb_state *mrb)
 {
-  mrb_close_duplicated(mrb);
+  mrb_thread_context *context;
+  mrb_int i;
+  if (!mrb) {
+    return;
+  }
+  context = MRB_GET_THREAD_CONTEXT(mrb);
+  for (i = 0; i < MRB_FIXED_THREAD_SIZE; ++i) {
+    if (MRB_GET_VM(mrb)->threads[i] == context) {
+      MRB_GET_VM(mrb)->threads[i] = NULL;
+      --MRB_GET_VM(mrb)->thread_count;
+      mrb_close_duplicated(mrb);
+      break;
+    }
+  }
 }
 
 MRB_API int
