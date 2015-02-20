@@ -11,6 +11,9 @@
 #  error Mutex API is required.
 #else
 #  include "mruby/mutex.h"
+#  include "mruby/thread.h"
+#  include "mruby/atomic.h"
+
 
 struct mrb_gvl_t {
   mrb_mutex_t *mutex;
@@ -43,7 +46,7 @@ mrb_gvl_acquire(mrb_state *mrb)
     return;
   }
   mrb_mutex_lock(mrb, MRB_GET_VM(mrb)->gvl->mutex);
-  MRB_GET_THREAD_CONTEXT(mrb)->flag_gvl_acquired = TRUE;
+  mrb_atomic_bool_store(&MRB_GET_THREAD_CONTEXT(mrb)->flag_gvl_acquired, TRUE);
 }
 
 MRB_API void
@@ -53,14 +56,17 @@ mrb_gvl_release(mrb_state *mrb)
     return;
   }
   mrb_mutex_unlock(mrb, MRB_GET_VM(mrb)->gvl->mutex);
-  MRB_GET_THREAD_CONTEXT(mrb)->flag_gvl_acquired = FALSE;
+  mrb_atomic_bool_store(&MRB_GET_THREAD_CONTEXT(mrb)->flag_gvl_acquired, FALSE);
 }
 
 MRB_API void
 mrb_gvl_yield(mrb_state *mrb)
 {
   mrb_gvl_release(mrb);
-  // TODO implement
+#ifdef MRB_USE_THREAD_API
+  mrb_atomic_bool_store(&MRB_GET_THREAD_CONTEXT(mrb)->flag_gvl_releasing_requested, FALSE);
+  mrb_thread_sleep(mrb, 0);
+#endif
   mrb_gvl_acquire(mrb);
 }
 

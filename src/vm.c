@@ -20,6 +20,7 @@
 #include "mruby/error.h"
 #include "mruby/opcode.h"
 #include "mruby/gvl.h"
+#include "mruby/atomic.h"
 #include "value_array.h"
 #include "mrb_throw.h"
 
@@ -745,20 +746,47 @@ argnum_error(mrb_state *mrb, mrb_int num)
 #define DIRECT_THREADED
 #endif
 
+#if defined(MRB_USE_GVL_API) && defined(MRB_USE_THREAD_API)
+#  define GVL_YIELD_IF_NEEDED \
+    if (mrb_atomic_bool_load(&MRB_GET_THREAD_CONTEXT(mrb)->flag_gvl_releasing_requested)) { \
+      mrb_gvl_yield(mrb); \
+    }
+#else
+#  define GVL_YIELD_IF_NEEDED
+#endif
+
 #ifndef DIRECT_THREADED
 
-#define INIT_DISPATCH for (;;) { i = *pc; CODE_FETCH_HOOK(mrb, irep, pc, regs); switch (GET_OPCODE(i)) {
+#define INIT_DISPATCH \
+  for (;;) { \
+    i = *pc; \
+    CODE_FETCH_HOOK(mrb, irep, pc, regs); \
+    GVL_YIELD_IF_NEEDED; \
+    switch (GET_OPCODE(i)) {
 #define CASE(op) case op:
-#define NEXT pc++; break
+#define NEXT \
+  pc++; \
+  break
 #define JUMP break
-#define END_DISPATCH }}
+#define END_DISPATCH \
+    } \
+  }
 
 #else
 
-#define INIT_DISPATCH JUMP; return mrb_nil_value();
+#define INIT_DISPATCH \
+  JUMP; \
+  return mrb_nil_value();
 #define CASE(op) L_ ## op:
-#define NEXT i=*++pc; CODE_FETCH_HOOK(mrb, irep, pc, regs); goto *optable[GET_OPCODE(i)]
-#define JUMP i=*pc; CODE_FETCH_HOOK(mrb, irep, pc, regs); goto *optable[GET_OPCODE(i)]
+#define NEXT \
+  i=*++pc; \
+  CODE_FETCH_HOOK(mrb, irep, pc, regs); \
+  GVL_YIELD_IF_NEEDED; \
+  goto *optable[GET_OPCODE(i)]
+#define JUMP \
+  i=*pc; \
+  CODE_FETCH_HOOK(mrb, irep, pc, regs); \
+  goto *optable[GET_OPCODE(i)]
 
 #define END_DISPATCH
 

@@ -24,6 +24,10 @@ MRB_API int mrb_thread_join(mrb_state *mrb, mrb_thread_t *thread, void *result);
 MRB_API mrb_state *mrb_thread_attach_vm(mrb_state *mrb);
 MRB_API void mrb_thread_detach_vm(mrb_state *mrb);
 MRB_API int  mrb_thread_sleep(mrb_state *mrb, uint32_t millis);
+#ifdef MRB_USE_GVL_API
+MRB_API void mrb_timer_thread_create(mrb_state *mrb);
+MRB_API void mrb_timer_thread_destroy(mrb_state *mrb);
+#endif
 
 #ifdef __cplusplus
 }

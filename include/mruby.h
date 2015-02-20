@@ -39,6 +39,7 @@ extern "C" {
 #include "mrbconf.h"
 #include "mruby/value.h"
 #include "mruby/version.h"
+#include "mruby/atomic_types.h"
 
 typedef uint32_t mrb_code;
 typedef uint32_t mrb_aspec;
@@ -189,6 +190,10 @@ typedef struct mrb_vm_context {
   mrb_int thread_count;
   mrb_int thread_index;
 #endif
+#if defined(MRB_USE_GVL_API) && defined(MRB_USE_THREAD_API)
+  struct mrb_thread_t *timer_thread;
+  mrb_atomic_bool_t stop_timer_thread;
+#endif
 } mrb_vm_context;
 
 /*
@@ -209,7 +214,10 @@ typedef struct mrb_thread_context {
   int arena_idx;
 
 #ifdef MRB_USE_GVL_API
-  mrb_bool flag_gvl_acquired;
+  mrb_atomic_bool_t flag_gvl_acquired;
+#  ifdef MRB_USE_THREAD_API
+  mrb_atomic_bool_t flag_gvl_releasing_requested;
+#  endif
 #endif
 
 #ifdef MRB_USE_THREAD_API

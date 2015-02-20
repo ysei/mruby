@@ -11,6 +11,7 @@
 #include "mruby/variable.h"
 #include "mruby/debug.h"
 #include "mruby/string.h"
+#include "mruby/thread.h"
 #include "mruby/gvl.h"
 
 void mrb_init_heap(mrb_state*);
@@ -74,6 +75,10 @@ mrb_open_core(mrb_allocf f, void *ud)
 #endif
 
   mrb_init_core(mrb);
+
+#if defined(MRB_USE_THREAD_API) && defined(MRB_USE_GVL_API)
+  mrb_timer_thread_create(mrb);
+#endif
 
   return mrb;
 }
@@ -272,6 +277,10 @@ mrb_free_context(mrb_state *mrb, struct mrb_context *c)
 MRB_API void
 mrb_close(mrb_state *mrb)
 {
+#if defined MRB_USE_THREAD_API && defined MRB_USE_GVL_API
+  mrb_timer_thread_destroy(mrb);
+#endif
+
   if (MRB_GET_VM(mrb)->atexit_stack_len > 0) {
     mrb_int i;
     for (i = MRB_GET_VM(mrb)->atexit_stack_len; i > 0; --i) {
