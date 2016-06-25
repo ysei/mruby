@@ -19,7 +19,45 @@ MRuby::Build.new do |conf|
   # conf.gem :github => 'masuidrive/mrbgems-example', :checksum_hash => '76518e8aecd131d047378448ac8055fa29d974a9'
   # conf.gem :git => 'git@github.com:masuidrive/mrbgems-example.git', :branch => 'master', :options => '-v'
 
-    conf.gem :github => 'mattn/mruby-thread', :branch => 'master'
+  conf.bins = %w(mrbc mruby ) # mirb
+
+  # conf.gem :github => 'mattn/mruby-thread'
+  # conf.gem :github => 'postmodern/mruby-thread', :branch => 'master'
+  # conf.gem :github => 'matsumoto-r/mruby-thread', :branch => 'master'
+  # conf.gem :github => 'hatoishi/mruby-thread', :branch => 'master'
+  # conf.gem :github => 'ysei/mruby-thread', :branch => 'master_-_merge_-_postmodern_-_master_-_pthread_kill_-_8a67d500'
+  # conf.gem :github => 'ysei/mruby-thread', :branch => 'crimsonwoods_-_experimental_thread_support_-_normal'
+    conf.gem :github => 'ysei/mruby-thread', :branch => 'mruby-meta-circular-heiretu'
+  # conf.gem :github => 'crimsonwoods/mruby-thread', :branch => 'experimental_thread_support'
+  # conf.gem :github => 'ysei/mruby-thread', :branch => 'ac8d04fb6c'
+  # conf.gem :github => 'miura1729/mruby-meta-circular'
+  # conf.gem :github => 'miura1729/mruby-future'
+    conf.gem :github => 'ysei/mruby-meta-circular-heiretu', :branch => 'heiretu'
+  # conf.gem :github => 'charlescui/mruby-cache', :branch => 'master'
+  # conf.gem :github => 'matsumoto-r/mruby-userdata', :branch => 'master'
+  # conf.gem :github => 'iij/mruby-env'
+    conf.gem :github => 'ysei/mruby-env', :branch => 'mruby-meta-circular-heiretu'
+  # conf.gem :github => 'mattn/mruby-json'
+    conf.gem :github => 'ysei/mruby-json', :branch => 'mruby-meta-circular-heiretu'
+  # conf.gem :github => 'suzukaze/mruby-msgpack', :branch => 'master'
+  # conf.gem :github => 'take-cheeze/mruby-msgpack', :branch => 'master'
+  # conf.gem :github => 'schmurfy/mruby-msgpack', :branch => 'master'
+  # conf.gem :github => 'matsumoto-r/mruby-redis', :branch => 'master'
+  # conf.gem :github => 'matsumoto-r/mruby-vedis', :branch => 'master'
+  # conf.gem :github => 'iij/mruby-io'
+  # conf.gem :github => 'ysei/mruby-io', :branch => 'master_-_mattn_-_global_variables'
+    conf.gem :github => 'ysei/mruby-io', :branch => 'mruby-meta-circular-heiretu'
+  # conf.gem :github => 'iij/mruby-dir'
+  # conf.gem :github => 'iij/mruby-tempfile'
+  # conf.gem :github => 'iij/mruby-require'
+  # conf.gem :github => 'iij/mruby-process'
+    conf.gem :github => 'ysei/mruby-process', :branch => 'mruby-meta-circular-heiretu'
+  # conf.gem :github => 'kimushu/mruby-sleep' # msleep usleep
+  # conf.gem :github => 'ysei/mruby-sleep', :branch => 'mruby-meta-circular-heiretu'
+  # conf.gem :github => 'bamchoh/mruby-sleep', :branch => 'support-float-value'
+  # conf.gem :github => 'wasabiz/mruby-partcont'
+  # mruby-eval
+  #memcached / Couchbase / MongoDB
 
 
   # include the default GEMs
